@@ -84,7 +84,7 @@ public class CreateEdlTask : IScheduledTask
         {
             foreach (var media in kvp.Value)
             {
-                segmentsList.AddRange(await _mediaSegmentManager.GetSegmentsAsync(media.ItemId, null, false).ConfigureAwait(false));
+                segmentsList.AddRange(await _mediaSegmentManager.GetSegmentsAsync(media.ItemId, null, true).ConfigureAwait(false));
             }
         }
 
