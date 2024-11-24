@@ -80,7 +80,7 @@ public class PluginEdlController : ControllerBase
         {
             foreach (var media in kvp.Value)
             {
-                segmentsList.AddRange(await _mediaSegmentManager.GetSegmentsAsync(media.ItemId, null).ConfigureAwait(false));
+                segmentsList.AddRange(await _mediaSegmentManager.GetSegmentsAsync(media.ItemId, null, false).ConfigureAwait(false));
             }
         }
 
@@ -118,7 +118,7 @@ public class PluginEdlController : ControllerBase
         {
             foreach (var media in kvp.Value)
             {
-                segmentsList.AddRange(await _mediaSegmentManager.GetSegmentsAsync(media.ItemId, null).ConfigureAwait(false));
+                segmentsList.AddRange(await _mediaSegmentManager.GetSegmentsAsync(media.ItemId, null, false).ConfigureAwait(false));
             }
         }
 
