@@ -1,18 +1,64 @@
 name: '🚀 Publish Plugin'
-
 on:
-  release:
-    types:
-      - released
   workflow_dispatch:
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
-  call:
-    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/publish.yaml@master
-    with:
-      version: ${{ github.event.release.tag_name }}
-      is-unstable: ${{ github.event.release.prerelease }}
-    secrets:
-      deploy-host: ${{ secrets.DEPLOY_HOST }}
-      deploy-user: ${{ secrets.DEPLOY_USER }}
-      deploy-key: ${{ secrets.DEPLOY_KEY }}
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version from VERSION.txt
+        id: read-version
+        run: |
+          NEW_FILE_VERSION=0.3.0
+          echo "NEW_FILE_VERSION=${NEW_FILE_VERSION}" >> $GITHUB_ENV
+          GIT_HASH=$(git rev-parse --short HEAD)
+          echo "GIT_HASH=${GIT_HASH}" >> $GITHUB_ENV
+
+      - name: Check for BETA file
+        id: check-beta
+        run: |
+          if [ -f "BETA" ]; then
+            echo "IS_BETA=true" >> $GITHUB_ENV
+          else
+            echo "IS_BETA=false" >> $GITHUB_ENV
+          fi
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+
+      - name: Restore Beta dependencies
+        if: ${{env.IS_BETA == 'true' }}
+        run: |
+          dotnet nuget add source --username ${{ github.repository_owner }} --password ${{ secrets.GITHUB_TOKEN }} --store-password-in-clear-text --name jellyfin-pre "https://nuget.pkg.github.com/jellyfin/index.json"
+          dotnet tool install --global dotnet-outdated-tool
+          dotnet outdated -pre Always -u -inc Jellyfin
+
+      - name: Restore dependencies
+        if: ${{env.IS_BETA == 'false' }}
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Create archive
+        run: zip -j "Jellyfin.Plugin.Edl-${{ env.NEW_FILE_VERSION }}.zip" Jellyfin.Plugin.Edl/bin/Release/net8.0/Jellyfin.Plugin.Edl.dll
+
+      - name: Create new release with tag
+        if: github.event_name != 'pull_request'
+        run: gh release create "${{ env.NEW_FILE_VERSION }}-${{ env.GIT_HASH }}" "Jellyfin.Plugin.Edl-${{ env.NEW_FILE_VERSION }}.zip" --title "Release ${{ env.NEW_FILE_VERSION }}-${{ env.GIT_HASH }}" --latest --generate-notes --target 10.10.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
