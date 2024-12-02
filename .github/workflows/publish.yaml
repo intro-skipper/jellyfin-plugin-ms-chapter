@@ -13,10 +13,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Read version from VERSION.txt
+      - name: Read version from variable
         id: read-version
         run: |
-          NEW_FILE_VERSION=0.3.0
+          NEW_FILE_VERSION=0.3.1
           echo "NEW_FILE_VERSION=${NEW_FILE_VERSION}" >> $GITHUB_ENV
           GIT_HASH=$(git rev-parse --short HEAD)
           echo "GIT_HASH=${GIT_HASH}" >> $GITHUB_ENV
