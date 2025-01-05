@@ -113,7 +113,6 @@ namespace ChapterCreator
             var runtime = item?.RunTimeTicks ?? 0;
 
             var chapters = new List<Chapter>();
-            var chapterNumber = 1;  // Initialize counter
             MediaSegmentDto? previousSegment = null;
             var maxGap = 10_000_000 * config.MaxGap;
 
@@ -122,12 +121,13 @@ namespace ChapterCreator
 
             foreach (var segment in segments)
             {
+                var isIntro = segment.Type == MediaSegmentType.Intro;
                 // Check for gap between segments
                 var gap = segment.StartTicks - (previousSegment?.EndTicks ?? 0);
                 if (gap >= maxGap)
                 {
                     // Name the placeholder chapter based on position
-                    var placeholderName = !hasSeenIntro ? config.Prologue :
+                    var placeholderName = isIntro && !hasSeenIntro ? config.Prologue :
                                         hasSeenOutro ? config.Epilogue :
                                         config.Main;
 
@@ -137,15 +137,12 @@ namespace ChapterCreator
                         EndTime = TickToTime(segment.StartTicks),
                         Title = placeholderName
                     });
-                    chapterNumber++;
                 }
 
                 // Update intro/outro flags before processing the segment
-                if (segment.Type == MediaSegmentType.Intro)
-                {
-                    hasSeenIntro = true;
-                }
-                else if (segment.Type == MediaSegmentType.Outro)
+                hasSeenIntro = isIntro || hasSeenIntro;
+
+                if (segment.Type == MediaSegmentType.Outro)
                 {
                     hasSeenOutro = true;
                 }
@@ -161,11 +158,10 @@ namespace ChapterCreator
                         EndTime = TickToTime(segment.EndTicks),
                         Title = name
                     });
-                    chapterNumber++;
                 }
 
                 // Add final chapter if there's significant runtime remaining
-                if (runtime > 0 && segment == segments[^1] && runtime - segment.EndTicks >= maxGap)
+                if (hasSeenOutro && runtime > 0 && segment == segments[^1] && runtime - segment.EndTicks >= maxGap)
                 {
                     var placeholderName = hasSeenOutro ? config.Epilogue : config.Main;
                     chapters.Add(new Chapter
@@ -174,7 +170,6 @@ namespace ChapterCreator
                         EndTime = TickToTime(runtime),
                         Title = placeholderName
                     });
-                    chapterNumber++;
                 }
 
                 previousSegment = segment;
