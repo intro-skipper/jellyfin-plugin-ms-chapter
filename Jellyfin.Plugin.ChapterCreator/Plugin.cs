@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using Jellyfin.Plugin.Edl.Configuration;
+using Jellyfin.Plugin.ChapterCreator.Configuration;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Common.Plugins;
 using MediaBrowser.Controller.Entities;
@@ -9,14 +9,14 @@ using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Plugins;
 using MediaBrowser.Model.Serialization;
 
-namespace Jellyfin.Plugin.Edl;
+namespace Jellyfin.Plugin.ChapterCreator;
 
 /// <summary>
 /// The main plugin.
 /// </summary>
 public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 {
-    private ILibraryManager _libraryManager;
+    private readonly ILibraryManager _libraryManager;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Plugin"/> class.
@@ -36,7 +36,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     }
 
     /// <inheritdoc />
-    public override string Name => "EDL Creator";
+    public override string Name => "Chapter Creator";
 
     /// <inheritdoc />
     public override Guid Id => Guid.Parse("6B0E323A-4AEE-4B10-813F-1E060488AE90");
@@ -49,21 +49,19 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     /// <inheritdoc />
     public IEnumerable<PluginPageInfo> GetPages()
     {
-        return new[]
-        {
+        return
+        [
             new PluginPageInfo
             {
-                Name = this.Name,
+                Name = Name,
                 EmbeddedResourcePath = string.Format(CultureInfo.InvariantCulture, "{0}.Configuration.configPage.html", GetType().Namespace)
-            }
-        };
+            },
+        ];
     }
 
-    internal BaseItem GetItem(Guid id)
+    internal BaseItem? GetItem(Guid id)
     {
-#pragma warning disable CS8603 // Possible null reference return.
-        return _libraryManager.GetItemById(id);
-#pragma warning restore CS8603 // Possible null reference return.
+        return id != Guid.Empty ? _libraryManager.GetItemById(id) : null;
     }
 
     /// <summary>
@@ -73,6 +71,6 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     /// <returns>Full path to item.</returns>
     internal string GetItemPath(Guid id)
     {
-        return GetItem(id).Path;
+        return GetItem(id)?.Path ?? string.Empty;
     }
 }

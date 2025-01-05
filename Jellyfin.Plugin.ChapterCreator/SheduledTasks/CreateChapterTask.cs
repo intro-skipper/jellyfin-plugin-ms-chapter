@@ -2,46 +2,38 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Jellyfin.Plugin.Edl;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.MediaSegments;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace Jellyfin.Plugin.EdlManager;
+namespace Jellyfin.Plugin.ChapterCreator.SheduledTasks;
 
 /// <summary>
-/// Create edl files task.
+/// Create chapter files task.
 /// </summary>
-public class CreateEdlTask : IScheduledTask
+/// <remarks>
+/// Initializes a new instance of the <see cref="CreateChapterTask"/> class.
+/// </remarks>
+/// <param name="loggerFactory">Logger factory.</param>
+/// <param name="libraryManager">Library manager.</param>
+/// <param name="mediaSegmentManager">MediaSegment manager.</param>
+public class CreateChapterTask(
+    ILoggerFactory loggerFactory,
+    ILibraryManager libraryManager,
+    IMediaSegmentManager mediaSegmentManager) : IScheduledTask
 {
-    private readonly ILoggerFactory _loggerFactory;
+    private readonly ILoggerFactory _loggerFactory = loggerFactory;
 
-    private readonly ILibraryManager _libraryManager;
+    private readonly ILibraryManager _libraryManager = libraryManager;
 
-    private readonly IMediaSegmentManager _mediaSegmentManager;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="CreateEdlTask"/> class.
-    /// </summary>
-    /// <param name="loggerFactory">Logger factory.</param>
-    /// <param name="libraryManager">Library manager.</param>
-    /// <param name="mediaSegmentManager">MediaSegment manager.</param>
-    public CreateEdlTask(
-        ILoggerFactory loggerFactory,
-        ILibraryManager libraryManager,
-        IMediaSegmentManager mediaSegmentManager)
-    {
-        _loggerFactory = loggerFactory;
-        _libraryManager = libraryManager;
-        _mediaSegmentManager = mediaSegmentManager;
-    }
+    private readonly IMediaSegmentManager _mediaSegmentManager = mediaSegmentManager;
 
     /// <summary>
     /// Gets the task name.
     /// </summary>
-    public string Name => "Create EDL";
+    public string Name => "Create Chapters";
 
     /// <summary>
     /// Gets the task category.
@@ -51,15 +43,15 @@ public class CreateEdlTask : IScheduledTask
     /// <summary>
     /// Gets the task description.
     /// </summary>
-    public string Description => "Create .edl files from Media Segments.";
+    public string Description => "Create .chapter files from Media Segments.";
 
     /// <summary>
     /// Gets the task key.
     /// </summary>
-    public string Key => "JFPEdlCreate";
+    public string Key => "JFPChapterCreate";
 
     /// <summary>
-    /// Create all .edl files which are not yet created but a media segments is available.
+    /// Create all chapter files which are not yet created but a media segments is available.
     /// </summary>
     /// <param name="progress">Task progress.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -71,8 +63,8 @@ public class CreateEdlTask : IScheduledTask
             throw new InvalidOperationException("Library manager was null");
         }
 
-        var baseEdlTask = new BaseEdlTask(
-            _loggerFactory.CreateLogger<CreateEdlTask>());
+        var baseChapterTask = new BaseChapterTask(
+            _loggerFactory.CreateLogger<CreateChapterTask>());
 
         var queueManager = new QueueManager(_loggerFactory.CreateLogger<QueueManager>(), _libraryManager);
 
@@ -88,8 +80,11 @@ public class CreateEdlTask : IScheduledTask
             }
         }
 
-        // write edl files
-        baseEdlTask.CreateEdls(progress, segmentsList.AsReadOnly(), false, cancellationToken);
+        // write chapter files
+        if (segmentsList.Count > 0)
+        {
+            baseChapterTask.CreateChapters(progress, segmentsList.AsReadOnly(), false, cancellationToken);
+        }
 
         return;
     }

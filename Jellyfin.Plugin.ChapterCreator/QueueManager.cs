@@ -1,4 +1,4 @@
-namespace Jellyfin.Plugin.Edl;
+namespace Jellyfin.Plugin.ChapterCreator;
 
 using System;
 using System.Collections.Generic;
@@ -19,12 +19,12 @@ using Microsoft.Extensions.Logging;
 /// </summary>
 public class QueueManager
 {
-    private ILibraryManager _libraryManager;
-    private ILogger<QueueManager> _logger;
-    private List<string> selectedLibraries;
-    private Dictionary<string, List<int>> skippedTvShows;
-    private List<string> skippedMovies;
-    private Dictionary<Guid, List<QueuedMedia>> _queuedMedia;
+    private readonly ILibraryManager _libraryManager;
+    private readonly ILogger<QueueManager> _logger;
+    private readonly Dictionary<string, List<int>> _skippedTvShows;
+    private readonly Dictionary<Guid, List<QueuedMedia>> _queuedMedia;
+    private List<string> _selectedLibraries;
+    private List<string> _skippedMovies;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="QueueManager"/> class.
@@ -36,10 +36,10 @@ public class QueueManager
         _logger = logger;
         _libraryManager = libraryManager;
 
-        selectedLibraries = new();
+        _selectedLibraries = new();
         _queuedMedia = new();
-        skippedTvShows = new();
-        skippedMovies = new();
+        _skippedTvShows = new();
+        _skippedMovies = new();
     }
 
     /// <summary>
@@ -54,7 +54,7 @@ public class QueueManager
         foreach (var folder in _libraryManager.GetVirtualFolders())
         {
             // If libraries have been selected for analysis, ensure this library was selected.
-            if (selectedLibraries.Count > 0 && !selectedLibraries.Contains(folder.Name))
+            if (_selectedLibraries.Count > 0 && !_selectedLibraries.Contains(folder.Name))
             {
                 _logger.LogDebug("Not analyzing library \"{Name}\": not selected by user", folder.Name);
                 continue;
@@ -116,12 +116,12 @@ public class QueueManager
         var config = Plugin.Instance!.Configuration;
 
         // Get the list of library names which have been selected for analysis, ignoring whitespace and empty entries.
-        selectedLibraries = config.SelectedLibraries
+        _selectedLibraries = config.SelectedLibraries
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .ToList();
 
         // Get the list movie names which should be skipped.
-        skippedMovies = config.SkippedMovies
+        _skippedMovies = config.SkippedMovies
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .ToList();
 
@@ -132,7 +132,7 @@ public class QueueManager
 
         foreach (var s in show)
         {
-            if (s.Contains(';', System.StringComparison.InvariantCulture))
+            if (s.Contains(';', StringComparison.InvariantCulture))
             {
                 var rseasons = s.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                 var seasons = rseasons.Skip(1).ToArray();
@@ -153,18 +153,18 @@ public class QueueManager
                     }
                 }
 
-                skippedTvShows.Add(name, seasonNumbers);
+                _skippedTvShows.Add(name, seasonNumbers);
             }
             else
             {
-                skippedTvShows.Add(s, new List<int>());
+                _skippedTvShows.Add(s, new List<int>());
             }
         }
 
         // If any libraries have been selected for analysis, log their names.
-        if (selectedLibraries.Count > 0)
+        if (_selectedLibraries.Count > 0)
         {
-            _logger.LogInformation("Limiting analysis to the following libraries: {Selected}", selectedLibraries);
+            _logger.LogInformation("Limiting analysis to the following libraries: {Selected}", _selectedLibraries);
         }
         else
         {
@@ -182,12 +182,12 @@ public class QueueManager
         {
             // Order by series name, season, and then episode number so that status updates are logged in order
             ParentId = Guid.Parse(rawId),
-            OrderBy = new[]
-            {
+            OrderBy =
+            [
                 (ItemSortBy.SeriesSortName, SortOrder.Ascending),
                 (ItemSortBy.ParentIndexNumber, SortOrder.Ascending),
                 (ItemSortBy.IndexNumber, SortOrder.Ascending),
-            },
+            ],
             IncludeItemTypes = includes,
             Recursive = true,
             IsVirtualItem = false
@@ -220,7 +220,7 @@ public class QueueManager
             }
             else if (item is Movie movie)
             {
-                if (skippedMovies.Contains(movie.Name))
+                if (_skippedMovies.Contains(movie.Name))
                 {
                     _logger.LogInformation("Skipping Movie: '{Name}'", movie.Name);
                     continue;
@@ -246,9 +246,9 @@ public class QueueManager
     // Test if should skip the episode
     private bool SkipEpisode(Episode episode)
     {
-        if (skippedTvShows.TryGetValue(episode.SeriesName, out var seasons))
+        if (_skippedTvShows.TryGetValue(episode.SeriesName, out var seasons))
         {
-            return (episode.AiredSeasonNumber != null && seasons.Contains(episode.AiredSeasonNumber.GetValueOrDefault())) ? true : false;
+            return episode.AiredSeasonNumber != null && seasons.Contains(episode.AiredSeasonNumber.GetValueOrDefault());
         }
 
         return false;

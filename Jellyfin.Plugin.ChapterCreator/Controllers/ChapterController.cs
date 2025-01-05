@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Net.Mime;
 using System.Threading;
 using System.Threading.Tasks;
-using Jellyfin.Plugin.EdlManager;
+using Jellyfin.Plugin.ChapterCreator.SheduledTasks;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.MediaSegments;
@@ -13,28 +13,28 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
-namespace Jellyfin.Plugin.Edl.Controllers;
+namespace Jellyfin.Plugin.ChapterCreator.Controllers;
 
 /// <summary>
-/// PluginEdl controller.
+/// Chapter controller.
 /// </summary>
 [Authorize(Policy = "RequiresElevation")]
 [ApiController]
 [Produces(MediaTypeNames.Application.Json)]
-[Route("PluginEdl")]
-public class PluginEdlController : ControllerBase
+[Route("PluginChapter")]
+public class ChapterController : ControllerBase
 {
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILibraryManager _libraryManager;
     private readonly IMediaSegmentManager _mediaSegmentManager;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="PluginEdlController"/> class.
+    /// Initializes a new instance of the <see cref="ChapterController"/> class.
     /// </summary>
     /// <param name="loggerFactory">Logger factory.</param>
     /// <param name="libraryManager">LibraryManager.</param>
     /// <param name="mediaSegmentManager">MediaSegmentsManager.</param>
-    public PluginEdlController(
+    public ChapterController(
         ILoggerFactory loggerFactory,
         ILibraryManager libraryManager,
         IMediaSegmentManager mediaSegmentManager)
@@ -61,13 +61,13 @@ public class PluginEdlController : ControllerBase
     }
 
     /// <summary>
-    /// Get Edl data based on itemId.
+    /// Get Chapter data based on itemId.
     /// </summary>
     /// <param name="itemId">ItemId.</param>
-    /// <returns>The edl data.</returns>
-    [HttpGet("Edl/{itemId}")]
+    /// <returns>The chapter data.</returns>
+    [HttpGet("Chapter/{itemId}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<JsonResult> GetEdlData(
+    public async Task<JsonResult> GetChapterData(
         [FromRoute, Required] Guid itemId)
     {
         var queueManager = new QueueManager(_loggerFactory.CreateLogger<QueueManager>(), _libraryManager);
@@ -84,29 +84,29 @@ public class PluginEdlController : ControllerBase
             }
         }
 
-        var rawstring = EdlManager.ToEdl(segmentsList.AsReadOnly());
+        var rawstring = ChapterManager.ToChapter(itemId, segmentsList.AsReadOnly());
 
         var json = new
         {
             itemId,
-            edl = rawstring
+            chapter = rawstring
         };
 
         return new JsonResult(json);
     }
 
     /// <summary>
-    /// Force edl recreation for itemIds.
+    /// Force chapter recreation for itemIds.
     /// </summary>
     /// <param name="itemIds">ItemIds.</param>
     /// <returns>Ok.</returns>
-    [HttpPost("Edl")]
+    [HttpPost("Chapter")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<OkResult> GenerateData(
         [FromBody, Required] Guid[] itemIds)
     {
-        var baseEdlTask = new BaseEdlTask(
-            _loggerFactory.CreateLogger<CreateEdlTask>());
+        var baseChapterTask = new BaseChapterTask(
+            _loggerFactory.CreateLogger<CreateChapterTask>());
 
         var queueManager = new QueueManager(_loggerFactory.CreateLogger<QueueManager>(), _libraryManager);
 
@@ -125,8 +125,8 @@ public class PluginEdlController : ControllerBase
         IProgress<double> progress = new Progress<double>();
         CancellationToken cancellationToken = CancellationToken.None;
 
-        // write edl files
-        baseEdlTask.CreateEdls(progress, segmentsList.AsReadOnly(), true, cancellationToken);
+        // write chapter files
+        baseChapterTask.CreateChapters(progress, segmentsList.AsReadOnly(), true, cancellationToken);
 
         return new OkResult();
     }

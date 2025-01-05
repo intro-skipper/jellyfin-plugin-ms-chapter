@@ -1,6 +1,6 @@
 using MediaBrowser.Model.Plugins;
 
-namespace Jellyfin.Plugin.Edl.Configuration;
+namespace Jellyfin.Plugin.ChapterCreator.Configuration;
 
 /// <summary>
 /// Plugin configuration.
@@ -8,55 +8,47 @@ namespace Jellyfin.Plugin.Edl.Configuration;
 public class PluginConfiguration : BasePluginConfiguration
 {
     /// <summary>
-    /// Initializes a new instance of the <see cref="PluginConfiguration"/> class.
+    /// Gets or sets the maximum gap between chapters in seconds.
     /// </summary>
-    public PluginConfiguration()
-    {
-        UnknownEdlAction = EdlAction.None;
-        IntroEdlAction = EdlAction.None;
-        OutroEdlAction = EdlAction.None;
-        PreviewEdlAction = EdlAction.None;
-        RecapEdlAction = EdlAction.None;
-        CommercialEdlAction = EdlAction.CommercialBreak;
-    }
+    public int MaxGap { get; set; } = 3;
 
     /// <summary>
     /// Gets or sets an Unknown Action option.
     /// </summary>
-    public EdlAction UnknownEdlAction { get; set; }
+    public string Unknown { get; set; } = "Unknown";
 
     /// <summary>
     /// Gets or sets an Intro Action option.
     /// </summary>
-    public EdlAction IntroEdlAction { get; set; } = EdlAction.Cut;
+    public string Intro { get; set; } = "Opening";
 
     /// <summary>
     /// Gets or sets an Outro Action option.
     /// </summary>
-    public EdlAction OutroEdlAction { get; set; }
+    public string Outro { get; set; } = "Ending";
 
     /// <summary>
     /// Gets or sets an Preview Action option.
     /// </summary>
-    public EdlAction PreviewEdlAction { get; set; }
+    public string Preview { get; set; } = "Preview";
 
     /// <summary>
     /// Gets or sets an Recap Action option.
     /// </summary>
-    public EdlAction RecapEdlAction { get; set; }
+    public string Recap { get; set; } = "Recap";
 
     /// <summary>
     /// Gets or sets an Commercial Action option.
     /// </summary>
-    public EdlAction CommercialEdlAction { get; set; } = EdlAction.CommercialBreak;
+    public string Commercial { get; set; } = "Commercial";
 
     /// <summary>
-    /// Gets or sets a value indicating whether to overwrite existing edl files. Which keeps the file in sync with media segment edits.
+    /// Gets or sets a value indicating whether to overwrite existing xml files. Which keeps the file in sync with media segment edits.
     /// </summary>
-    public bool OverwriteEdlFiles { get; set; } = true;
+    public bool OverwriteFiles { get; set; } = true;
 
     /// <summary>
-    /// Gets or sets the max degree of parallelism used when creating edl files.
+    /// Gets or sets the max degree of parallelism used when creating chapter files.
     /// </summary>
     public int MaxParallelism { get; set; } = 2;
 
