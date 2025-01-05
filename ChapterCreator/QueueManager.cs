@@ -37,10 +37,10 @@ public class QueueManager
         _logger = logger;
         _libraryManager = libraryManager;
 
-        _selectedLibraries = new();
-        _queuedMedia = new();
-        _skippedTvShows = new();
-        _skippedMovies = new();
+        _selectedLibraries = [];
+        _queuedMedia = [];
+        _skippedTvShows = [];
+        _skippedMovies = [];
     }
 
     /// <summary>

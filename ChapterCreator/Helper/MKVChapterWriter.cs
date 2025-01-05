@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Xml;
 using ChapterCreator.Data;
+using Microsoft.Extensions.Logging;
 
 namespace ChapterCreator.Helper;
 
@@ -18,21 +19,37 @@ public static class MKVChapterWriter
     /// <param name="filename">The filename to write the chapter file to.</param>
     /// <param name="chapters">List of chapters to write to the file.</param>
     /// <param name="overwrite">Force the file overwrite.</param>
-    public static void CreateChapterXmlFile(string filename, IReadOnlyList<Chapter> chapters, bool overwrite)
+    /// <param name="logger">The logger to use for logging.</param>
+    public static void CreateChapterXmlFile(string filename, IReadOnlyList<Chapter> chapters, bool overwrite, ILogger? logger = null)
     {
+        ArgumentNullException.ThrowIfNull(filename);
+
         if (chapters is null || chapters.Count == 0)
         {
+            logger?.LogDebug("No chapters provided for file {Filename}", filename);
             return;
         }
 
-        if (File.Exists(filename) && !overwrite)
+        if (File.Exists(filename))
         {
-            return;
+            if (!overwrite)
+            {
+                logger?.LogDebug("Skipping existing chapter file {Filename} (overwrite disabled)", filename);
+                return;
+            }
+
+            logger?.LogDebug("Overwriting existing chapter file {Filename}", filename);
         }
+
+        var directoryPath = Path.GetDirectoryName(filename)!;
+        Directory.CreateDirectory(directoryPath);
+        logger?.LogDebug("Ensuring directory exists: {Directory}", directoryPath);
 
         // Generate random UIDs for the Edition and Chapters
         long editionUID = GenerateUID();
         long[] chapterUIDs = [.. Enumerable.Range(0, chapters.Count).Select(_ => GenerateUID())];
+
+        logger?.LogDebug("Writing {Count} chapters to {Filename}", chapters.Count, filename);
 
         // Create an XML writer with appropriate settings
         XmlWriterSettings settings = new XmlWriterSettings
@@ -43,34 +60,51 @@ public static class MKVChapterWriter
         };
 
         using XmlWriter writer = XmlWriter.Create(filename, settings);
-        // Start the Matroska chapters document
+
+        // Write the XML structure using constants for element names
         writer.WriteStartDocument();
         writer.WriteStartElement("Chapters");
-
-        // Create an EditionEntry with EditionUID
-        writer.WriteStartElement("EditionEntry");
-        writer.WriteElementString("EditionUID", editionUID.ToString(System.Globalization.CultureInfo.InvariantCulture));
-
-        // Write each chapter
-        for (int i = 0; i < chapters.Count; i++)
         {
-            writer.WriteStartElement("ChapterAtom");
-            // Write ChapterUID and ChapterTimeStart
-            writer.WriteElementString("ChapterUID", chapterUIDs[i].ToString(System.Globalization.CultureInfo.InvariantCulture));
-            writer.WriteElementString("ChapterTimeStart", chapters[i].StartTime);
+            writer.WriteStartElement("EditionEntry");
+            {
+                writer.WriteElementString("EditionUID", editionUID.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                writer.WriteElementString("EditionFlagDefault", "1");  // Add default flag
+                writer.WriteElementString("EditionFlagHidden", "0");   // Add hidden flag
 
-            // Write ChapterDisplay element with ChapterString
-            writer.WriteStartElement("ChapterDisplay");
-            writer.WriteElementString("ChapterString", chapters[i].Title);
-            writer.WriteElementString("ChapterLanguage", "und");
-            writer.WriteEndElement(); // End ChapterDisplay
+                // Write each chapter
+                for (int i = 0; i < chapters.Count; i++)
+                {
+                    WriteChapterAtom(writer, chapters[i], chapterUIDs[i]);
+                }
+            }
 
-            writer.WriteEndElement(); // End ChapterAtom
+            writer.WriteEndElement(); // End EditionEntry
         }
 
-        writer.WriteEndElement(); // End EditionEntry
         writer.WriteEndElement(); // End Chapters
         writer.WriteEndDocument();
+    }
+
+    private static void WriteChapterAtom(XmlWriter writer, Chapter chapter, long chapterUID)
+    {
+        writer.WriteStartElement("ChapterAtom");
+        {
+            writer.WriteElementString("ChapterUID", chapterUID.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            writer.WriteElementString("ChapterFlagHidden", "0");
+            writer.WriteElementString("ChapterFlagEnabled", "1");
+            writer.WriteElementString("ChapterTimeStart", chapter.StartTime);
+            writer.WriteElementString("ChapterTimeEnd", chapter.EndTime);
+
+            writer.WriteStartElement("ChapterDisplay");
+            {
+                writer.WriteElementString("ChapterString", chapter.Title);
+                writer.WriteElementString("ChapterLanguage", "und");
+            }
+
+            writer.WriteEndElement(); // End ChapterDisplay
+        }
+
+        writer.WriteEndElement(); // End ChapterAtom
     }
 
     // Method to generate a random UID (Matroska recommends 64-bit unsigned integers)

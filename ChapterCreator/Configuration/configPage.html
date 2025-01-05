@@ -9,160 +9,87 @@
             <div data-role="content">
                 <div class="content-primary">
                     <form id="TemplateConfigForm">
-                        <div class="selectContainer">
-                            <label class="selectLabel" for="IntroEdlAction">Intro EDL Action</label>
-                            <select is="emby-select" id="IntroEdlAction" class="emby-select-withcolor emby-select">
-                                <option value="None">None (Don't add an action for intro)</option>
-
-                                <option value="CommercialBreak">Commercial Break (Skip)</option>
-
-                                <option value="Cut">Cut (player will remove segment from the video)</option>
-
-                                <option value="Mute">Mute (audio will be muted)</option>
-
-                                <option value="SceneMarker">Scene Marker (create a chapter marker)</option>
-                            </select>
-
-                            <div class="fieldDescription">
-                                EDL Action for Intro Media Segments <br />
-                                Which action to write to
-                                <a href="https://kodi.wiki/view/Edit_decision_list">MPlayer compatible EDL files</a>
-                                alongside your media files.
-                            </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="Intro"> Intro </label>
+                            <input id="Intro" type="text" is="emby-input" />
+                            <div class="fieldDescription">Enter the name the chapter will be named for the intro segment.</div>
                         </div>
-                        <div class="selectContainer">
-                            <label class="selectLabel" for="OutroEdlAction">Outro EDL Action</label>
-                            <select is="emby-select" id="OutroEdlAction" class="emby-select-withcolor emby-select">
-                                <option value="None">None (Don't add an action for outro)</option>
 
-                                <option value="CommercialBreak">Commercial Break (Skip)</option>
-
-                                <option value="Cut">Cut (player will remove segment from the video)</option>
-
-                                <option value="Mute">Mute (audio will be muted)</option>
-
-                                <option value="SceneMarker">Scene Marker (create a chapter marker)</option>
-                            </select>
-
-                            <div class="fieldDescription">
-                                EDL Action for Outro Media Segments <br />
-                                Which action to write to
-                                <a href="https://kodi.wiki/view/Edit_decision_list">MPlayer compatible EDL files</a>
-                                alongside your media files.
-                            </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="Outro"> Outro </label>
+                            <input id="Outro" type="text" is="emby-input" />
+                            <div class="fieldDescription">Enter the name the chapter will be named for the outro segment.</div>
                         </div>
-                        <div class="selectContainer">
-                            <label class="selectLabel" for="PreviewEdlAction">Preview EDL Action</label>
-                            <select is="emby-select" id="PreviewEdlAction" class="emby-select-withcolor emby-select">
-                                <option value="None">None (Don't add an action for preview)</option>
 
-                                <option value="CommercialBreak">Commercial Break (Skip)</option>
-
-                                <option value="Cut">Cut (player will remove segment from the video)</option>
-
-                                <option value="Mute">Mute (audio will be muted)</option>
-
-                                <option value="SceneMarker">Scene Marker (create a chapter marker)</option>
-                            </select>
-
-                            <div class="fieldDescription">
-                                EDL Action for Preview Media Segments <br />
-                                Which action to write to
-                                <a href="https://kodi.wiki/view/Edit_decision_list">MPlayer compatible EDL files</a>
-                                alongside your media files.
-                            </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="Recap"> Recap </label>
+                            <input id="Recap" type="text" is="emby-input" />
+                            <div class="fieldDescription">Enter the name the chapter will be named for the recap segment.</div>
                         </div>
-                        <div class="selectContainer">
-                            <label class="selectLabel" for="RecapEdlAction">Recap EDL Action</label>
-                            <select is="emby-select" id="RecapEdlAction" class="emby-select-withcolor emby-select">
-                                <option value="None">None (Don't add an action for Recap)</option>
 
-                                <option value="CommercialBreak">Commercial Break (Skip)</option>
-
-                                <option value="Cut">Cut (player will remove segment from the video)</option>
-
-                                <option value="Mute">Mute (audio will be muted)</option>
-
-                                <option value="SceneMarker">Scene Marker (create a chapter marker)</option>
-                            </select>
-
-                            <div class="fieldDescription">
-                                EDL Action for Recap Media Segments <br />
-                                Which action to write to
-                                <a href="https://kodi.wiki/view/Edit_decision_list">MPlayer compatible EDL files</a>
-                                alongside your media files.
-                            </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="Preview"> Preview </label>
+                            <input id="Preview" type="text" is="emby-input" />
+                            <div class="fieldDescription">Enter the name the chapter will be named for the preview segment.</div>
                         </div>
-                        <div class="selectContainer">
-                            <label class="selectLabel" for="CommercialEdlAction">Commercial EDL Action</label>
-                            <select is="emby-select" id="CommercialEdlAction" class="emby-select-withcolor emby-select">
-                                <option value="None">None (Don't add an action for Commercial)</option>
 
-                                <option selected value="CommercialBreak">Commercial Break (Skip)</option>
-
-                                <option value="Cut">Cut (player will remove segment from the video)</option>
-
-                                <option value="Mute">Mute (audio will be muted)</option>
-
-                                <option value="SceneMarker">Scene Marker (create a chapter marker)</option>
-                            </select>
-
-                            <div class="fieldDescription">
-                                EDL Action for Commercial Media Segments <br />
-                                Which action to write to
-                                <a href="https://kodi.wiki/view/Edit_decision_list">MPlayer compatible EDL files</a>
-                                alongside your media files.
-                            </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="Commercial"> Commercial </label>
+                            <input id="Commercial" type="text" is="emby-input" />
+                            <div class="fieldDescription">Enter the name the chapter will be named for the commercial segment.</div>
                         </div>
-                        <div class="selectContainer">
-                            <label class="selectLabel" for="UnknownEdlAction">Unknown EDL Action</label>
-                            <select is="emby-select" id="UnknownEdlAction" class="emby-select-withcolor emby-select">
-                                <option value="None">None (Don't add an action for preview)</option>
 
-                                <option value="CommercialBreak">Commercial Break (Skip)</option>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="Main"> Main </label>
+                            <input id="Main" type="text" is="emby-input" />
+                            <div class="fieldDescription">Enter the name the chapter will be named for the part between intro and outro.</div>
+                        </div>
 
-                                <option value="Cut">Cut (player will remove segment from the video)</option>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="Prologue"> Prologue </label>
+                            <input id="Prologue" type="text" is="emby-input" />
+                            <div class="fieldDescription">Enter the name the chapter will be named for the part before the intro segment.</div>
+                        </div>
 
-                                <option value="Mute">Mute (audio will be muted)</option>
-
-                                <option value="SceneMarker">Scene Marker (create a chapter marker)</option>
-                            </select>
-
-                            <div class="fieldDescription">
-                                EDL Action for "Unknown" Media Segments <br />
-                                Which action to write to
-                                <a href="https://kodi.wiki/view/Edit_decision_list">MPlayer compatible EDL files</a>
-                                alongside your media files.
-                            </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="Epilogue"> Epilogue </label>
+                            <input id="Epilogue" type="text" is="emby-input" />
+                            <div class="fieldDescription">Enter the name the chapter will be named for the part after the outro segment.</div>
                         </div>
 
                         <div class="inputContainer">
                             <label class="inputLabel inputLabelUnfocused" for="SelectedLibraries"> Limit analysis to the following libraries </label>
                             <input id="SelectedLibraries" type="text" is="emby-input" />
-                            <div class="fieldDescription">Enter the names of libraries it should create EDL files for, separated by commas. If this field is left blank, all libraries on the server containing movies or television episodes will be used.</div>
+                            <div class="fieldDescription">Enter the names of libraries it should create chapter files for, separated by commas. If this field is left blank, all libraries on the server containing movies or television episodes will be used.</div>
                         </div>
 
                         <div class="inputContainer">
                             <label class="inputLabel inputLabelUnfocused" for="SkippedTvShows"> Skip TV Shows </label>
                             <input id="SkippedTvShows" type="text" is="emby-input" />
-                            <div class="fieldDescription">Enter the names of tv shows to skip the EDL creation, separated by commas. You can also skip seasons. Format: "My Show;S01;S02, Another Show, Third Show;S03;S05"</div>
+                            <div class="fieldDescription">Enter the names of tv shows to skip the chapter file creation, separated by commas. You can also skip seasons. Format: "My Show;S01;S02, Another Show, Third Show;S03;S05"</div>
                         </div>
 
                         <div class="inputContainer">
                             <label class="inputLabel inputLabelUnfocused" for="SkippedMovies"> Skip Movies </label>
                             <input id="SkippedMovies" type="text" is="emby-input" />
-                            <div class="fieldDescription">Enter the names of Movies to skip the EDL creation, separated by commas. Format: "The Godfather, Spiderman, Matrix"</div>
+                            <div class="fieldDescription">Enter the names of Movies to skip the chapter file creation, separated by commas. Format: "The Godfather, Spiderman, Matrix"</div>
                         </div>
 
                         <div class="inputContainer">
                             <label class="inputLabel inputLabelUnfocused" for="MaxParallelism"> Maximum degree of parallelism </label>
                             <input id="MaxParallelism" type="number" is="emby-input" min="1" />
-                            <div class="fieldDescription">Maximum degree of parallelism to use when creating .edl files.</div>
+                            <div class="fieldDescription">Maximum degree of parallelism to use when creating chapter files.</div>
+                        </div>
+
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="MaxGap"> Maximum gap between chapters </label>
+                            <input id="MaxGap" type="number" is="emby-input" min="0" />
+                            <div class="fieldDescription">Maximum gap between chapters in seconds.</div>
                         </div>
                         <div class="checkboxContainer checkboxContainer-withDescription">
                             <label class="emby-checkbox-label">
-                                <input id="OverwriteEdlFiles" type="checkbox" is="emby-checkbox" checked />
-                                <span>Update EDL files</span>
+                                <input id="OverwriteFiles" type="checkbox" is="emby-checkbox" checked />
+                                <span>Update chapter files</span>
                             </label>
 
                             <div class="fieldDescription">If checked, the plugin will update already created files to keep them in sync with Media Segments.</div>
@@ -183,14 +110,17 @@
                 document.querySelector("#TemplateConfigPage").addEventListener("pageshow", function () {
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(TemplateConfig.pluginUniqueId).then(function (config) {
-                        document.querySelector("#UnknownEdlAction").value = config.UnknownEdlAction;
-                        document.querySelector("#IntroEdlAction").value = config.IntroEdlAction;
-                        document.querySelector("#OutroEdlAction").value = config.OutroEdlAction;
-                        document.querySelector("#PreviewEdlAction").value = config.PreviewEdlAction;
-                        document.querySelector("#RecapEdlAction").value = config.RecapEdlAction;
-                        document.querySelector("#CommercialEdlAction").value = config.CommercialEdlAction;
-                        document.querySelector("#OverwriteEdlFiles").checked = config.OverwriteEdlFiles;
+                        document.querySelector("#Intro").value = config.Intro;
+                        document.querySelector("#Outro").value = config.Outro;
+                        document.querySelector("#Recap").value = config.Recap;
+                        document.querySelector("#Preview").value = config.Preview;
+                        document.querySelector("#Commercial").value = config.Commercial;
+                        document.querySelector("#Main").value = config.Main;
+                        document.querySelector("#Prologue").value = config.Prologue;
+                        document.querySelector("#Epilogue").value = config.Epilogue;
+                        document.querySelector("#OverwriteFiles").checked = config.OverwriteFiles;
                         document.querySelector("#MaxParallelism").value = config.MaxParallelism;
+                        document.querySelector("#MaxGap").value = config.MaxGap;
                         document.querySelector("#SelectedLibraries").value = config.SelectedLibraries;
                         document.querySelector("#SkippedTvShows").value = config.SkippedTvShows;
                         document.querySelector("#SkippedMovies").value = config.SkippedMovies;
@@ -201,14 +131,18 @@
                 document.querySelector("#TemplateConfigForm").addEventListener("submit", function (e) {
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(TemplateConfig.pluginUniqueId).then(function (config) {
-                        config.UnknownEdlAction = document.querySelector("#UnknownEdlAction").value;
-                        config.IntroEdlAction = document.querySelector("#IntroEdlAction").value;
-                        config.OutroEdlAction = document.querySelector("#OutroEdlAction").value;
-                        config.PreviewEdlAction = document.querySelector("#PreviewEdlAction").value;
-                        config.RecapEdlAction = document.querySelector("#RecapEdlAction").value;
-                        config.CommercialEdlAction = document.querySelector("#CommercialEdlAction").value;
-                        config.OverwriteEdlFiles = document.querySelector("#OverwriteEdlFiles").checked;
+                        config.Unknown = document.querySelector("#Unknown").value;
+                        config.Intro = document.querySelector("#Intro").value;
+                        config.Outro = document.querySelector("#Outro").value;
+                        config.Preview = document.querySelector("#Preview").value;
+                        config.Recap = document.querySelector("#Recap").value;
+                        config.Commercial = document.querySelector("#Commercial").value;
+                        config.Main = document.querySelector("#Main").value;
+                        config.Prologue = document.querySelector("#Prologue").value;
+                        config.Epilogue = document.querySelector("#Epilogue").value;
+                        config.OverwriteFiles = document.querySelector("#OverwriteFiles").checked;
                         config.MaxParallelism = document.querySelector("#MaxParallelism").value;
+                        config.MaxGap = document.querySelector("#MaxGap").value;
                         config.SelectedLibraries = document.querySelector("#SelectedLibraries").value;
                         config.SkippedTvShows = document.querySelector("#SkippedTvShows").value;
                         config.SkippedMovies = document.querySelector("#SkippedMovies").value;

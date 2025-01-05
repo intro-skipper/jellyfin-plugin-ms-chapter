@@ -8,11 +8,6 @@ namespace ChapterCreator.Configuration;
 public class PluginConfiguration : BasePluginConfiguration
 {
     /// <summary>
-    /// Gets or sets the maximum gap between chapters in seconds.
-    /// </summary>
-    public int MaxGap { get; set; } = 3;
-
-    /// <summary>
     /// Gets or sets an Unknown Action option.
     /// </summary>
     public string Unknown { get; set; } = "Unknown";
@@ -43,6 +38,21 @@ public class PluginConfiguration : BasePluginConfiguration
     public string Commercial { get; set; } = "Commercial";
 
     /// <summary>
+    /// Gets or sets an Main Action option.
+    /// </summary>
+    public string Main { get; set; } = "Main";
+
+    /// <summary>
+    /// Gets or sets an Prologue Action option.
+    /// </summary>
+    public string Prologue { get; set; } = "Prologue";
+
+    /// <summary>
+    /// Gets or sets an Epilogue Action option.
+    /// </summary>
+    public string Epilogue { get; set; } = "Epilogue";
+
+    /// <summary>
     /// Gets or sets a value indicating whether to overwrite existing chapter files. Which keeps the file in sync with media segment edits.
     /// </summary>
     public bool OverwriteFiles { get; set; } = true;
@@ -51,6 +61,11 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets the max degree of parallelism used when creating chapter files.
     /// </summary>
     public int MaxParallelism { get; set; } = 2;
+
+    /// <summary>
+    /// Gets or sets the maximum gap between chapters in seconds.
+    /// </summary>
+    public int MaxGap { get; set; } = 3;
 
     /// <summary>
     /// Gets or sets the comma separated list of library names to analyze. If empty, all libraries will be analyzed.

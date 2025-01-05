@@ -49,28 +49,47 @@ namespace ChapterCreator
         /// <param name="forceOverwrite">Force the file overwrite.</param>
         public static void UpdateChapterFile(KeyValuePair<Guid, List<MediaSegmentDto>> psegment, bool forceOverwrite)
         {
-            var overwrite = Plugin.Instance!.Configuration.OverwriteFiles || forceOverwrite;
+            ArgumentNullException.ThrowIfNull(psegment.Value);
+
             var id = psegment.Key;
             var segments = psegment.Value;
+            var overwrite = Plugin.Instance!.Configuration.OverwriteFiles || forceOverwrite;
 
-            var chapterContent = ToChapter(id, segments.AsReadOnly());
+            _logger?.LogDebug("Processing chapters for item {Id}", id);
 
-            // Test if we generated data
-            if (chapterContent.Count > 0)
+            try
             {
-                var filePath = Plugin.Instance!.GetItemPath(id);
+                var chapterContent = ToChapter(id, segments.AsReadOnly());
 
-                // guard for missing media file/folder.
-                if (File.Exists(filePath))
+                if (chapterContent.Count == 0)
                 {
-                    var chapterPath = GetChapterPath(filePath);
-
-                    MKVChapterWriter.CreateChapterXmlFile(chapterPath, chapterContent, overwrite);
+                    _logger?.LogDebug("Skip id ({Id}): no chapter data generated", id);
+                    return;
                 }
+
+                var filePath = Plugin.Instance!.GetItemPath(id);
+                if (string.IsNullOrEmpty(filePath))
+                {
+                    _logger?.LogWarning("Skip id ({Id}): unable to get item path", id);
+                    return;
+                }
+
+                if (!File.Exists(filePath))
+                {
+                    _logger?.LogWarning("Skip id ({Id}): media file not found at {Path}", id, filePath);
+                    return;
+                }
+
+                var chapterPath = GetChapterPath(filePath);
+                _logger?.LogDebug("Writing chapters to {Path}", chapterPath);
+
+                MKVChapterWriter.CreateChapterXmlFile(chapterPath, chapterContent, overwrite, _logger);
+                _logger?.LogDebug("Successfully created chapter file for {Id} at {Path}", id, chapterPath);
             }
-            else
+            catch (Exception ex)
             {
-                _logger?.LogDebug("Skip id ({Id}) no chapter data generated", id);
+                _logger?.LogError(ex, "Failed to create chapter file for item {Id}", id);
+                throw;
             }
         }
 
@@ -87,6 +106,8 @@ namespace ChapterCreator
                 return [];
             }
 
+            var config = Plugin.Instance!.Configuration;
+
             // Get episode runtime from item
             var item = Plugin.Instance?.GetItem(id);
             var runtime = item?.RunTimeTicks ?? 0;
@@ -94,7 +115,7 @@ namespace ChapterCreator
             var chapters = new List<Chapter>();
             var chapterNumber = 1;  // Initialize counter
             MediaSegmentDto? previousSegment = null;
-            var maxGap = 10_000_000 * Plugin.Instance!.Configuration.MaxGap;
+            var maxGap = 10_000_000 * config.MaxGap;
 
             var hasSeenIntro = false;
             var hasSeenOutro = false;
@@ -106,13 +127,14 @@ namespace ChapterCreator
                 if (gap >= maxGap)
                 {
                     // Name the placeholder chapter based on position
-                    var placeholderName = !hasSeenIntro ? "Prologue" :
-                                        hasSeenOutro ? "Epilogue" :
-                                        "Main";
+                    var placeholderName = !hasSeenIntro ? config.Prologue :
+                                        hasSeenOutro ? config.Epilogue :
+                                        config.Main;
 
                     chapters.Add(new Chapter
                     {
                         StartTime = TickToTime(previousSegment?.EndTicks ?? 0),
+                        EndTime = TickToTime(segment.StartTicks),
                         Title = placeholderName
                     });
                     chapterNumber++;
@@ -136,6 +158,7 @@ namespace ChapterCreator
                     chapters.Add(new Chapter
                     {
                         StartTime = TickToTime(segment.StartTicks),
+                        EndTime = TickToTime(segment.EndTicks),
                         Title = name
                     });
                     chapterNumber++;
@@ -144,10 +167,11 @@ namespace ChapterCreator
                 // Add final chapter if there's significant runtime remaining
                 if (runtime > 0 && segment == segments[^1] && runtime - segment.EndTicks >= maxGap)
                 {
-                    var placeholderName = hasSeenOutro ? "Epilogue" : "Main";
+                    var placeholderName = hasSeenOutro ? config.Epilogue : config.Main;
                     chapters.Add(new Chapter
                     {
                         StartTime = TickToTime(segment.EndTicks),
+                        EndTime = TickToTime(runtime),
                         Title = placeholderName
                     });
                     chapterNumber++;

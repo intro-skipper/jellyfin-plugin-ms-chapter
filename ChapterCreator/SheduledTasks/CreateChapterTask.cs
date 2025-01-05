@@ -38,12 +38,12 @@ public class CreateChapterTask(
     /// <summary>
     /// Gets the task category.
     /// </summary>
-    public string Category => "Media Analyzer";
+    public string Category => "Intro Skipper";
 
     /// <summary>
     /// Gets the task description.
     /// </summary>
-    public string Description => "Create .chapter files from Media Segments.";
+    public string Description => "Create chapter xml files from Media Segments.";
 
     /// <summary>
     /// Gets the task key.
