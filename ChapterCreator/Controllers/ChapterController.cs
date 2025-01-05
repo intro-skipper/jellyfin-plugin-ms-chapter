@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Net.Mime;
 using System.Threading;
 using System.Threading.Tasks;
-using Jellyfin.Plugin.ChapterCreator.SheduledTasks;
+using ChapterCreator.SheduledTasks;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.MediaSegments;
@@ -13,7 +13,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
-namespace Jellyfin.Plugin.ChapterCreator.Controllers;
+namespace ChapterCreator.Controllers;
 
 /// <summary>
 /// Chapter controller.

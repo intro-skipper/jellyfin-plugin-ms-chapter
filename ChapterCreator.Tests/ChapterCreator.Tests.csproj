@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Jellyfin.Plugin.ChapterCreator\Jellyfin.Plugin.ChapterCreator.csproj" />
+    <ProjectReference Include="..\ChapterCreator\ChapterCreator.csproj" />
   </ItemGroup>
 
 </Project>

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using MediaBrowser.Model.MediaSegments;
 using Microsoft.Extensions.Logging;
 
-namespace Jellyfin.Plugin.ChapterCreator.SheduledTasks
+namespace ChapterCreator.SheduledTasks
 {
     /// <summary>
     /// Common code shared by all chapter creator tasks.

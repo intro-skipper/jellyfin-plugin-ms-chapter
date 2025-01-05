@@ -1,12 +1,12 @@
 using System;
 
-namespace Jellyfin.Plugin.ChapterCreator
+namespace ChapterCreator.Data;
+
+/// <summary>
+/// Media queued for analysis.
+/// </summary>
+public class QueuedMedia
 {
-    /// <summary>
-    /// Media queued for analysis.
-    /// </summary>
-    public class QueuedMedia
-    {
         /// <summary>
         /// Gets or sets the Series name.
         /// </summary>
@@ -41,5 +41,4 @@ namespace Jellyfin.Plugin.ChapterCreator
         /// Gets or sets the total duration of this media file (in seconds).
         /// </summary>
         public int Duration { get; set; }
-    }
 }

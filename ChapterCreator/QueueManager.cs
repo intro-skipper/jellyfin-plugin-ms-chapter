@@ -1,4 +1,4 @@
-namespace Jellyfin.Plugin.ChapterCreator;
+namespace ChapterCreator;
 
 using System;
 using System.Collections.Generic;
@@ -6,6 +6,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using ChapterCreator.Data;
 using Jellyfin.Data.Enums;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
@@ -116,14 +117,10 @@ public class QueueManager
         var config = Plugin.Instance!.Configuration;
 
         // Get the list of library names which have been selected for analysis, ignoring whitespace and empty entries.
-        _selectedLibraries = config.SelectedLibraries
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .ToList();
+        _selectedLibraries = [.. config.SelectedLibraries.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
 
         // Get the list movie names which should be skipped.
-        _skippedMovies = config.SkippedMovies
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .ToList();
+        _skippedMovies = [.. config.SkippedMovies.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
 
         // Get the list of tvshow names and seasons which should be skipped for analysis.
         var show = config.SkippedTvShows
@@ -157,7 +154,7 @@ public class QueueManager
             }
             else
             {
-                _skippedTvShows.Add(s, new List<int>());
+                _skippedTvShows.Add(s, []);
             }
         }
 

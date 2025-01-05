@@ -4,7 +4,7 @@ using Jellyfin.Data.Enums;
 using MediaBrowser.Model.MediaSegments;
 using Xunit;
 
-namespace Jellyfin.Plugin.ChapterCreator.Tests;
+namespace ChapterCreator.Tests;
 
 public class TestChapter
 {
@@ -31,7 +31,7 @@ public class TestChapter
             }
         ]);
 
-        var actual = ChapterManager.ToChapter(Guid.NewGuid(), segments);
+        var actual = ChapterManager.ToChapter(Guid.NewGuid(), segments).ToString();
 
         Assert.Equal(expected, actual);
     }

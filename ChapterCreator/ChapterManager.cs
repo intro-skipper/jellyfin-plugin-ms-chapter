@@ -2,11 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
+using ChapterCreator.Data;
+using ChapterCreator.Helper;
 using Jellyfin.Data.Enums;
 using MediaBrowser.Model.MediaSegments;
 using Microsoft.Extensions.Logging;
 
-namespace Jellyfin.Plugin.ChapterCreator
+namespace ChapterCreator
 {
     /// <summary>
     /// ChapterManager class.
@@ -36,7 +38,7 @@ namespace Jellyfin.Plugin.ChapterCreator
 
             var config = Plugin.Instance!.Configuration;
 
-            _logger.LogDebug("Overwrite XML files: {Regenerate}", config.OverwriteFiles);
+            _logger.LogDebug("Overwrite Chapter files: {Regenerate}", config.OverwriteFiles);
             _logger.LogDebug("Max Parallelism: {Action}", config.MaxParallelism);
         }
 
@@ -54,7 +56,7 @@ namespace Jellyfin.Plugin.ChapterCreator
             var chapterContent = ToChapter(id, segments.AsReadOnly());
 
             // Test if we generated data
-            if (!string.IsNullOrEmpty(chapterContent))
+            if (chapterContent.Count > 0)
             {
                 var filePath = Plugin.Instance!.GetItemPath(id);
 
@@ -62,38 +64,8 @@ namespace Jellyfin.Plugin.ChapterCreator
                 if (File.Exists(filePath))
                 {
                     var chapterPath = GetChapterPath(filePath);
-                    var fexists = File.Exists(chapterPath);
 
-                    // User may not want an override
-                    if (!fexists || (fexists && overwrite))
-                    {
-                        var oldContent = string.Empty;
-                        var update = false;
-
-                        try
-                        {
-                            oldContent = File.ReadAllText(chapterPath);
-                        }
-                        catch (Exception)
-                        {
-                        }
-
-                        // check if we need to update
-                        if (!string.IsNullOrEmpty(oldContent) && oldContent != chapterContent)
-                        {
-                            update = true;
-                        }
-
-                        if (!fexists || update)
-                        {
-                            _logger?.LogDebug("{Action} Chapter file '{File}'", update ? "Overwrite/Update" : "Create", chapterPath);
-                            File.WriteAllText(chapterPath, chapterContent);
-                        }
-                    }
-                    else
-                    {
-                        _logger?.LogDebug("Chapter File exists, but overwrite is disabled: '{File}'", chapterPath);
-                    }
+                    MKVChapterWriter.CreateChapterXmlFile(chapterPath, chapterContent, overwrite);
                 }
             }
             else
@@ -108,18 +80,18 @@ namespace Jellyfin.Plugin.ChapterCreator
         /// <param name="id">The ItemId.</param>
         /// <param name="segments">The Segments.</param>
         /// <returns>String content of chapter file.</returns>
-        public static string ToChapter(Guid id, ReadOnlyCollection<MediaSegmentDto> segments)
+        public static IReadOnlyList<Chapter> ToChapter(Guid id, ReadOnlyCollection<MediaSegmentDto> segments)
         {
             if (segments is null || segments.Count == 0)
             {
-                return string.Empty;
+                return [];
             }
 
             // Get episode runtime from item
             var item = Plugin.Instance?.GetItem(id);
             var runtime = item?.RunTimeTicks ?? 0;
 
-            var fstring = string.Empty;
+            var chapters = new List<Chapter>();
             var chapterNumber = 1;  // Initialize counter
             MediaSegmentDto? previousSegment = null;
             var maxGap = 10_000_000 * Plugin.Instance!.Configuration.MaxGap;
@@ -138,7 +110,11 @@ namespace Jellyfin.Plugin.ChapterCreator
                                         hasSeenOutro ? "Epilogue" :
                                         "Main";
 
-                    fstring += ToChapterString(previousSegment?.EndTicks ?? 0, segment.StartTicks, placeholderName, chapterNumber);
+                    chapters.Add(new Chapter
+                    {
+                        StartTime = TickToTime(previousSegment?.EndTicks ?? 0),
+                        Title = placeholderName
+                    });
                     chapterNumber++;
                 }
 
@@ -157,7 +133,11 @@ namespace Jellyfin.Plugin.ChapterCreator
                 // Only add chapter if it has a name
                 if (!string.IsNullOrEmpty(name))
                 {
-                    fstring += ToChapterString(segment.StartTicks, segment.EndTicks, name, chapterNumber);
+                    chapters.Add(new Chapter
+                    {
+                        StartTime = TickToTime(segment.StartTicks),
+                        Title = name
+                    });
                     chapterNumber++;
                 }
 
@@ -165,16 +145,18 @@ namespace Jellyfin.Plugin.ChapterCreator
                 if (runtime > 0 && segment == segments[^1] && runtime - segment.EndTicks >= maxGap)
                 {
                     var placeholderName = hasSeenOutro ? "Epilogue" : "Main";
-                    fstring += ToChapterString(segment.EndTicks, runtime, placeholderName, chapterNumber);
+                    chapters.Add(new Chapter
+                    {
+                        StartTime = TickToTime(segment.EndTicks),
+                        Title = placeholderName
+                    });
                     chapterNumber++;
                 }
 
                 previousSegment = segment;
             }
 
-            // remove last newline
-            var newlineInd = fstring.LastIndexOf('\n');
-            return newlineInd > 0 ? fstring.Substring(0, newlineInd) : fstring;
+            return chapters;
         }
 
         /// <summary>
@@ -227,7 +209,13 @@ namespace Jellyfin.Plugin.ChapterCreator
         public static string GetChapterPath(string mediaPath)
         {
             var filename = Path.GetFileNameWithoutExtension(mediaPath);
-            return Path.Combine(Path.GetDirectoryName(mediaPath)!, $"{filename}_chapter.txt");
+            return Path.Combine(Path.GetDirectoryName(mediaPath)!, $"{filename}_chapter.xml");
+        }
+
+        private static string TickToTime(long ticks)
+        {
+            var timeSpan = TimeSpan.FromTicks(ticks);
+            return timeSpan.ToString(@"hh\:mm\:ss\.ff", System.Globalization.CultureInfo.InvariantCulture);
         }
     }
 }

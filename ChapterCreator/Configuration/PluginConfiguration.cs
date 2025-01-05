@@ -1,6 +1,6 @@
 using MediaBrowser.Model.Plugins;
 
-namespace Jellyfin.Plugin.ChapterCreator.Configuration;
+namespace ChapterCreator.Configuration;
 
 /// <summary>
 /// Plugin configuration.
@@ -43,7 +43,7 @@ public class PluginConfiguration : BasePluginConfiguration
     public string Commercial { get; set; } = "Commercial";
 
     /// <summary>
-    /// Gets or sets a value indicating whether to overwrite existing xml files. Which keeps the file in sync with media segment edits.
+    /// Gets or sets a value indicating whether to overwrite existing chapter files. Which keeps the file in sync with media segment edits.
     /// </summary>
     public bool OverwriteFiles { get; set; } = true;
 

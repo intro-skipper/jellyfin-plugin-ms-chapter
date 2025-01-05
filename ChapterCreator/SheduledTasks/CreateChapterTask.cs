@@ -8,7 +8,7 @@ using MediaBrowser.Model.MediaSegments;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace Jellyfin.Plugin.ChapterCreator.SheduledTasks;
+namespace ChapterCreator.SheduledTasks;
 
 /// <summary>
 /// Create chapter files task.
@@ -95,6 +95,6 @@ public class CreateChapterTask(
     /// <returns>Task triggers.</returns>
     public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()
     {
-        return Array.Empty<TaskTriggerInfo>();
+        return [];
     }
 }
