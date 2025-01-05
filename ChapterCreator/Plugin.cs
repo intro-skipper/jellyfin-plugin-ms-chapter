@@ -39,7 +39,7 @@ namespace ChapterCreator
         public override string Name => "Chapter Creator";
 
         /// <inheritdoc />
-        public override Guid Id => Guid.Parse("6B0E323A-4AEE-4B10-813F-1E060488AE90");
+        public override Guid Id => Guid.Parse("e22fb8f5-bc98-4f76-9be4-87de302a97ea");
 
         /// <summary>
         /// Gets the current plugin instance.
