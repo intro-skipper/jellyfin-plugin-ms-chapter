@@ -53,7 +53,15 @@ namespace ChapterCreator
 
             var id = psegment.Key;
             var segments = psegment.Value;
-            var overwrite = Plugin.Instance!.Configuration.OverwriteFiles || forceOverwrite;
+            var config = Plugin.Instance!.Configuration;
+            var overwrite = config.OverwriteFiles || forceOverwrite;
+
+            var embeddedChapters = Plugin.Instance.GetChapters(id);
+            if (embeddedChapters.Count > 0 && config.SkipEmbeddedChapters)
+            {
+                _logger?.LogDebug("Skipping item {Id} as it already has embedded chapters", id);
+                return;
+            }
 
             _logger?.LogDebug("Processing chapters for item {Id}", id);
 
@@ -228,7 +236,7 @@ namespace ChapterCreator
         public static string GetChapterPath(string mediaPath)
         {
             var filename = Path.GetFileNameWithoutExtension(mediaPath);
-            return Path.Combine(Path.GetDirectoryName(mediaPath)!, $"{filename}_chapter.xml");
+            return Path.Combine(Path.GetDirectoryName(mediaPath)!, $"{filename}_chapters.xml");
         }
 
         private static string TickToTime(long ticks)

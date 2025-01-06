@@ -58,6 +58,11 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool OverwriteFiles { get; set; } = true;
 
     /// <summary>
+    /// Gets or sets a value indicating whether to skip items with embedded chapters.
+    /// </summary>
+    public bool SkipEmbeddedChapters { get; set; } = true;
+
+    /// <summary>
     /// Gets or sets the max degree of parallelism used when creating chapter files.
     /// </summary>
     public int MaxParallelism { get; set; } = 2;

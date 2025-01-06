@@ -45,9 +45,7 @@ namespace ChapterCreator.SheduledTasks
                     .GroupBy(s => s.ItemId)
                     .ToDictionary(
                         g => g.Key,
-                        g => g.OrderBy(s => s.StartTicks).ToList())
-                    .OrderBy(kvp => kvp.Key)
-                    .ToList();
+                        g => g.OrderBy(s => s.StartTicks).ToList());
 
                 var totalQueued = sortedSegments.Count;
 
@@ -61,10 +59,7 @@ namespace ChapterCreator.SheduledTasks
 
                 Parallel.ForEach(sortedSegments, options, (segment) =>
                 {
-                    if (cancellationToken.IsCancellationRequested)
-                    {
-                        return;
-                    }
+                    cancellationToken.ThrowIfCancellationRequested();
 
                     ChapterManager.UpdateChapterFile(segment, forceOverwrite);
                     Interlocked.Add(ref totalProcessed, 1);

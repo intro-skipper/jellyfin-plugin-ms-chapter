@@ -88,6 +88,14 @@
                         </div>
                         <div class="checkboxContainer checkboxContainer-withDescription">
                             <label class="emby-checkbox-label">
+                                <input id="SkipEmbeddedChapters" type="checkbox" is="emby-checkbox" checked />
+                                <span>Skip items with embedded chapters</span>
+                            </label>
+
+                            <div class="fieldDescription">If checked, the plugin will skip items with embedded chapters.</div>
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
                                 <input id="OverwriteFiles" type="checkbox" is="emby-checkbox" checked />
                                 <span>Update chapter files</span>
                             </label>
@@ -118,6 +126,7 @@
                         document.querySelector("#Main").value = config.Main;
                         document.querySelector("#Prologue").value = config.Prologue;
                         document.querySelector("#Epilogue").value = config.Epilogue;
+                        document.querySelector("#SkipEmbeddedChapters").checked = config.SkipEmbeddedChapters;
                         document.querySelector("#OverwriteFiles").checked = config.OverwriteFiles;
                         document.querySelector("#MaxParallelism").value = config.MaxParallelism;
                         document.querySelector("#MaxGap").value = config.MaxGap;
@@ -141,6 +150,7 @@
                         config.Prologue = document.querySelector("#Prologue").value;
                         config.Epilogue = document.querySelector("#Epilogue").value;
                         config.OverwriteFiles = document.querySelector("#OverwriteFiles").checked;
+                        config.SkipEmbeddedChapters = document.querySelector("#SkipEmbeddedChapters").checked;
                         config.MaxParallelism = document.querySelector("#MaxParallelism").value;
                         config.MaxGap = document.querySelector("#MaxGap").value;
                         config.SelectedLibraries = document.querySelector("#SelectedLibraries").value;
