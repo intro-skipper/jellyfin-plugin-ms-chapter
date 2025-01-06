@@ -1,7 +1,7 @@
 ---
 name: "Chapter Creator"
 guid: "e22fb8f5-bc98-4f76-9be4-87de302a97ea"
-version: "0.4.0.1"
+version: "0.4.0.2"
 targetAbi: "10.10.3.0"
 framework: "net8.0"
 overview: "Create chapters.xml from Media Segments"
