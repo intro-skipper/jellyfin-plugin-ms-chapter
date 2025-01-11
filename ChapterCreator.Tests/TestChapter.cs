@@ -2,6 +2,7 @@ using System;
 using System.Collections.ObjectModel;
 using Jellyfin.Data.Enums;
 using MediaBrowser.Model.MediaSegments;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace ChapterCreator.Tests;
@@ -21,6 +22,8 @@ public class TestChapter
         "CHAPTER1=00:00:01.12\nCHAPTER1NAME=Preview")]
     public void TestChapterSerialization(long start, long end, MediaSegmentType type, string expected)
     {
+        var logger = new LoggerFactory().CreateLogger<ChapterManager>();
+        var chapterManager = new ChapterManager(logger);
         var segments = new ReadOnlyCollection<MediaSegmentDto>(
         [
             new MediaSegmentDto
@@ -31,7 +34,7 @@ public class TestChapter
             }
         ]);
 
-        var actual = ChapterManager.ToChapter(Guid.NewGuid(), segments).ToString();
+        var actual = chapterManager.ToChapter(Guid.NewGuid(), segments).ToString();
 
         Assert.Equal(expected, actual);
     }

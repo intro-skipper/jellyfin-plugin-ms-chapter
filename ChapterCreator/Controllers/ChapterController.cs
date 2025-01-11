@@ -6,43 +6,34 @@ using System.Threading;
 using System.Threading.Tasks;
 using ChapterCreator.SheduledTasks;
 using MediaBrowser.Controller;
-using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.MediaSegments;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 
 namespace ChapterCreator.Controllers;
 
 /// <summary>
 /// Chapter controller.
 /// </summary>
+/// <remarks>
+/// Initializes a new instance of the <see cref="ChapterController"/> class.
+/// </remarks>
+/// <param name="mediaSegmentManager">MediaSegmentsManager.</param>
+/// <param name="chapterManager">ChapterManager.</param>
+/// <param name="queueManager">QueueManager.</param>
 [Authorize(Policy = "RequiresElevation")]
 [ApiController]
 [Produces(MediaTypeNames.Application.Json)]
 [Route("PluginChapter")]
-public class ChapterController : ControllerBase
+public class ChapterController(
+    IMediaSegmentManager mediaSegmentManager,
+    IChapterManager chapterManager,
+    IQueueManager queueManager) : ControllerBase
 {
-    private readonly ILoggerFactory _loggerFactory;
-    private readonly ILibraryManager _libraryManager;
-    private readonly IMediaSegmentManager _mediaSegmentManager;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="ChapterController"/> class.
-    /// </summary>
-    /// <param name="loggerFactory">Logger factory.</param>
-    /// <param name="libraryManager">LibraryManager.</param>
-    /// <param name="mediaSegmentManager">MediaSegmentsManager.</param>
-    public ChapterController(
-        ILoggerFactory loggerFactory,
-        ILibraryManager libraryManager,
-        IMediaSegmentManager mediaSegmentManager)
-    {
-        _loggerFactory = loggerFactory;
-        _libraryManager = libraryManager;
-        _mediaSegmentManager = mediaSegmentManager;
-    }
+    private readonly IMediaSegmentManager _mediaSegmentManager = mediaSegmentManager;
+    private readonly IChapterManager _chapterManager = chapterManager;
+    private readonly IQueueManager _queueManager = queueManager;
 
     /// <summary>
     /// Plugin meta endpoint.
@@ -70,11 +61,9 @@ public class ChapterController : ControllerBase
     public async Task<JsonResult> GetChapterData(
         [FromRoute, Required] Guid itemId)
     {
-        var queueManager = new QueueManager(_loggerFactory.CreateLogger<QueueManager>(), _libraryManager);
-
         var segmentsList = new List<MediaSegmentDto>();
         // get ItemIds
-        var mediaItems = queueManager.GetMediaItemsById([itemId]);
+        var mediaItems = _queueManager.GetMediaItemsById([itemId]);
         // get MediaSegments from itemIds
         foreach (var kvp in mediaItems)
         {
@@ -84,7 +73,7 @@ public class ChapterController : ControllerBase
             }
         }
 
-        var rawstring = ChapterManager.ToChapter(itemId, segmentsList.AsReadOnly());
+        var rawstring = _chapterManager.ToChapter(itemId, segmentsList);
 
         var json = new
         {
@@ -105,14 +94,11 @@ public class ChapterController : ControllerBase
     public async Task<OkResult> GenerateData(
         [FromBody, Required] Guid[] itemIds)
     {
-        var baseChapterTask = new BaseChapterTask(
-            _loggerFactory.CreateLogger<CreateChapterTask>());
-
-        var queueManager = new QueueManager(_loggerFactory.CreateLogger<QueueManager>(), _libraryManager);
+        var baseChapterTask = new BaseChapterTask(_chapterManager);
 
         var segmentsList = new List<MediaSegmentDto>();
         // get ItemIds
-        var mediaItems = queueManager.GetMediaItemsById(itemIds);
+        var mediaItems = _queueManager.GetMediaItemsById(itemIds);
         // get MediaSegments from itemIds
         foreach (var kvp in mediaItems)
         {
@@ -126,7 +112,7 @@ public class ChapterController : ControllerBase
         CancellationToken cancellationToken = CancellationToken.None;
 
         // write chapter files
-        baseChapterTask.CreateChapters(progress, segmentsList.AsReadOnly(), true, cancellationToken);
+        baseChapterTask.CreateChapters(progress, segmentsList, true, cancellationToken);
 
         return new OkResult();
     }

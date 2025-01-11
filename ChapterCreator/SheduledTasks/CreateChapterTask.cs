@@ -6,7 +6,6 @@ using MediaBrowser.Controller;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.MediaSegments;
 using MediaBrowser.Model.Tasks;
-using Microsoft.Extensions.Logging;
 
 namespace ChapterCreator.SheduledTasks;
 
@@ -16,19 +15,22 @@ namespace ChapterCreator.SheduledTasks;
 /// <remarks>
 /// Initializes a new instance of the <see cref="CreateChapterTask"/> class.
 /// </remarks>
-/// <param name="loggerFactory">Logger factory.</param>
 /// <param name="libraryManager">Library manager.</param>
 /// <param name="mediaSegmentManager">MediaSegment manager.</param>
+/// <param name="chapterManager">ChapterManager.</param>
+/// <param name="queueManager">QueueManager.</param>
 public class CreateChapterTask(
-    ILoggerFactory loggerFactory,
     ILibraryManager libraryManager,
-    IMediaSegmentManager mediaSegmentManager) : IScheduledTask
+    IMediaSegmentManager mediaSegmentManager,
+    IChapterManager chapterManager,
+    IQueueManager queueManager) : IScheduledTask
 {
-    private readonly ILoggerFactory _loggerFactory = loggerFactory;
-
     private readonly ILibraryManager _libraryManager = libraryManager;
 
     private readonly IMediaSegmentManager _mediaSegmentManager = mediaSegmentManager;
+
+    private readonly IChapterManager _chapterManager = chapterManager;
+    private readonly IQueueManager _queueManager = queueManager;
 
     /// <summary>
     /// Gets the task name.
@@ -63,14 +65,11 @@ public class CreateChapterTask(
             throw new InvalidOperationException("Library manager was null");
         }
 
-        var baseChapterTask = new BaseChapterTask(
-            _loggerFactory.CreateLogger<CreateChapterTask>());
-
-        var queueManager = new QueueManager(_loggerFactory.CreateLogger<QueueManager>(), _libraryManager);
+        var baseChapterTask = new BaseChapterTask(_chapterManager);
 
         var segmentsList = new List<MediaSegmentDto>();
         // get ItemIds
-        var mediaItems = queueManager.GetMediaItems();
+        var mediaItems = _queueManager.GetMediaItems();
         // get MediaSegments from itemIds
         foreach (var kvp in mediaItems)
         {
@@ -83,7 +82,7 @@ public class CreateChapterTask(
         // write chapter files
         if (segmentsList.Count > 0)
         {
-            baseChapterTask.CreateChapters(progress, segmentsList.AsReadOnly(), false, cancellationToken);
+            baseChapterTask.CreateChapters(progress, segmentsList, false, cancellationToken);
         }
 
         return;

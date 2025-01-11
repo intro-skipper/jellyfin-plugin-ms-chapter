@@ -1,8 +1,5 @@
-namespace ChapterCreator;
-
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -15,39 +12,30 @@ using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Dto;
 using Microsoft.Extensions.Logging;
 
+namespace ChapterCreator;
+
 /// <summary>
 /// Manages enqueuing library items for analysis.
 /// </summary>
-public class QueueManager
+/// <remarks>
+/// Initializes a new instance of the <see cref="QueueManager"/> class.
+/// </remarks>
+/// <param name="logger">Logger.</param>
+/// <param name="libraryManager">Library manager.</param>
+public class QueueManager(ILogger<QueueManager> logger, ILibraryManager libraryManager) : IQueueManager
 {
-    private readonly ILibraryManager _libraryManager;
-    private readonly ILogger<QueueManager> _logger;
-    private readonly Dictionary<string, List<int>> _skippedTvShows;
-    private readonly Dictionary<Guid, List<QueuedMedia>> _queuedMedia;
-    private List<string> _selectedLibraries;
-    private List<string> _skippedMovies;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="QueueManager"/> class.
-    /// </summary>
-    /// <param name="logger">Logger.</param>
-    /// <param name="libraryManager">Library manager.</param>
-    public QueueManager(ILogger<QueueManager> logger, ILibraryManager libraryManager)
-    {
-        _logger = logger;
-        _libraryManager = libraryManager;
-
-        _selectedLibraries = [];
-        _queuedMedia = [];
-        _skippedTvShows = [];
-        _skippedMovies = [];
-    }
+    private readonly ILibraryManager _libraryManager = libraryManager;
+    private readonly ILogger<QueueManager> _logger = logger;
+    private readonly Dictionary<string, List<int>> _skippedTvShows = [];
+    private readonly Dictionary<Guid, List<QueuedMedia>> _queuedMedia = [];
+    private List<string> _selectedLibraries = [];
+    private List<string> _skippedMovies = [];
 
     /// <summary>
     /// Gets all media items on the server.
     /// </summary>
     /// <returns>Queued media items.</returns>
-    public ReadOnlyDictionary<Guid, List<QueuedMedia>> GetMediaItems()
+    public IReadOnlyDictionary<Guid, List<QueuedMedia>> GetMediaItems()
     {
         LoadAnalysisSettings();
 
@@ -76,7 +64,7 @@ public class QueueManager
             }
         }
 
-        return new(_queuedMedia);
+        return new Dictionary<Guid, List<QueuedMedia>>(_queuedMedia);
     }
 
     /// <summary>
@@ -84,7 +72,7 @@ public class QueueManager
     /// </summary>
     /// <param name="itemIds">All item ids to lookup.</param>
     /// <returns>Queued media items.</returns>
-    public ReadOnlyDictionary<Guid, List<QueuedMedia>> GetMediaItemsById(Guid[] itemIds)
+    public IReadOnlyDictionary<Guid, List<QueuedMedia>> GetMediaItemsById(Guid[] itemIds)
     {
         foreach (var item in itemIds)
         {
@@ -106,7 +94,7 @@ public class QueueManager
             }
         }
 
-        return new(_queuedMedia);
+        return new Dictionary<Guid, List<QueuedMedia>>(_queuedMedia);
     }
 
     /// <summary>
@@ -138,7 +126,7 @@ public class QueueManager
 
                 foreach (var season in seasons)
                 {
-                    var nr = season.Substring(1);
+                    var nr = season[1..];
 
                     try
                     {
@@ -319,7 +307,7 @@ public class QueueManager
         }
 
         // Allocate a new list for each movie
-        _queuedMedia.TryAdd(Guid.Parse(source.Id), new List<QueuedMedia>());
+        _queuedMedia.TryAdd(Guid.Parse(source.Id), []);
 
         _queuedMedia[Guid.Parse(source.Id)].Add(new QueuedMedia()
         {
@@ -338,8 +326,8 @@ public class QueueManager
     /// </summary>
     /// <param name="candidates">Queued media items.</param>
     /// <returns>Media items that have been verified to exist in Jellyfin and in storage.</returns>
-    public ReadOnlyCollection<QueuedMedia>
-        VerifyQueue(ReadOnlyCollection<QueuedMedia> candidates)
+    public IReadOnlyCollection<QueuedMedia>
+        VerifyQueue(IReadOnlyCollection<QueuedMedia> candidates)
     {
         var verified = new List<QueuedMedia>();
 
@@ -362,6 +350,6 @@ public class QueueManager
             }
         }
 
-        return verified.AsReadOnly();
+        return verified;
     }
 }

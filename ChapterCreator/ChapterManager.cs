@@ -1,248 +1,299 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
+using System.Xml;
 using ChapterCreator.Data;
-using ChapterCreator.Helper;
 using Jellyfin.Data.Enums;
 using MediaBrowser.Model.MediaSegments;
 using Microsoft.Extensions.Logging;
 
-namespace ChapterCreator
+namespace ChapterCreator;
+
+/// <summary>
+/// ChapterManager class.
+/// </summary>
+/// <remarks>
+/// Initializes a new instance of the <see cref="ChapterManager"/> class.
+/// </remarks>
+/// <param name="logger">The logger instance.</param>
+public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
 {
+    private readonly ILogger<ChapterManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
     /// <summary>
-    /// ChapterManager class.
+    /// Logs the configuration that will be used during Chapter file creation.
     /// </summary>
-    public static class ChapterManager
+    public void LogConfiguration()
     {
-        private static ILogger? _logger;
+        var config = Plugin.Instance!.Configuration;
 
-        /// <summary>
-        /// Initialize ChapterManager with a logger.
-        /// </summary>
-        /// <param name="logger">ILogger.</param>
-        public static void Initialize(ILogger logger)
+        _logger.LogDebug("Overwrite Chapter files: {Regenerate}", config.OverwriteFiles);
+        _logger.LogDebug("Max Parallelism: {Action}", config.MaxParallelism);
+    }
+
+    /// <summary>
+    /// Update Chapter file for the provided segments.
+    /// </summary>
+    /// <param name="psegment">Key value pair of segments dictionary.</param>
+    /// <param name="forceOverwrite">Force the file overwrite.</param>
+    public void UpdateChapterFile(KeyValuePair<Guid, List<MediaSegmentDto>> psegment, bool forceOverwrite)
+    {
+        ArgumentNullException.ThrowIfNull(psegment.Value);
+
+        var id = psegment.Key;
+        var segments = psegment.Value;
+        var config = Plugin.Instance!.Configuration;
+        var overwrite = config.OverwriteFiles || forceOverwrite;
+
+        var embeddedChapters = Plugin.Instance.GetChapters(id);
+        if (!forceOverwrite && embeddedChapters.Count > 0 && config.SkipEmbeddedChapters)
         {
-            _logger = logger;
+            _logger.LogDebug("Skipping item {Id} as it already has embedded chapters", id);
+            return;
         }
 
-        /// <summary>
-        /// Logs the configuration that will be used during Chapter file creation.
-        /// </summary>
-        public static void LogConfiguration()
+        _logger.LogDebug("Processing chapters for item {Id}", id);
+
+        try
         {
-            if (_logger is null)
+            var chapterContent = ToChapter(id, segments);
+
+            if (chapterContent.Count == 0)
             {
-                throw new InvalidOperationException("Logger must not be null");
-            }
-
-            var config = Plugin.Instance!.Configuration;
-
-            _logger.LogDebug("Overwrite Chapter files: {Regenerate}", config.OverwriteFiles);
-            _logger.LogDebug("Max Parallelism: {Action}", config.MaxParallelism);
-        }
-
-        /// <summary>
-        /// Update Chapter file for the provided segments.
-        /// </summary>
-        /// <param name="psegment">Key value pair of segments dictionary.</param>
-        /// <param name="forceOverwrite">Force the file overwrite.</param>
-        public static void UpdateChapterFile(KeyValuePair<Guid, List<MediaSegmentDto>> psegment, bool forceOverwrite)
-        {
-            ArgumentNullException.ThrowIfNull(psegment.Value);
-
-            var id = psegment.Key;
-            var segments = psegment.Value;
-            var config = Plugin.Instance!.Configuration;
-            var overwrite = config.OverwriteFiles || forceOverwrite;
-
-            var embeddedChapters = Plugin.Instance.GetChapters(id);
-            if (embeddedChapters.Count > 0 && config.SkipEmbeddedChapters)
-            {
-                _logger?.LogDebug("Skipping item {Id} as it already has embedded chapters", id);
+                _logger.LogDebug("Skip id ({Id}): no chapter data generated", id);
                 return;
             }
 
-            _logger?.LogDebug("Processing chapters for item {Id}", id);
-
-            try
+            var filePath = Plugin.Instance!.GetItemPath(id);
+            if (string.IsNullOrEmpty(filePath))
             {
-                var chapterContent = ToChapter(id, segments.AsReadOnly());
-
-                if (chapterContent.Count == 0)
-                {
-                    _logger?.LogDebug("Skip id ({Id}): no chapter data generated", id);
-                    return;
-                }
-
-                var filePath = Plugin.Instance!.GetItemPath(id);
-                if (string.IsNullOrEmpty(filePath))
-                {
-                    _logger?.LogWarning("Skip id ({Id}): unable to get item path", id);
-                    return;
-                }
-
-                if (!File.Exists(filePath))
-                {
-                    _logger?.LogWarning("Skip id ({Id}): media file not found at {Path}", id, filePath);
-                    return;
-                }
-
-                var chapterPath = GetChapterPath(filePath);
-                _logger?.LogDebug("Writing chapters to {Path}", chapterPath);
-
-                MKVChapterWriter.CreateChapterXmlFile(chapterPath, chapterContent, overwrite, _logger);
-                _logger?.LogDebug("Successfully created chapter file for {Id} at {Path}", id, chapterPath);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to create chapter file for item {Id}", id);
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Convert segments to a Kodi compatible Chapter entry.
-        /// </summary>
-        /// <param name="id">The ItemId.</param>
-        /// <param name="segments">The Segments.</param>
-        /// <returns>String content of chapter file.</returns>
-        public static IReadOnlyList<Chapter> ToChapter(Guid id, ReadOnlyCollection<MediaSegmentDto> segments)
-        {
-            if (segments is null || segments.Count == 0)
-            {
-                return [];
+                _logger.LogWarning("Skip id ({Id}): unable to get item path", id);
+                return;
             }
 
-            var config = Plugin.Instance!.Configuration;
-
-            // Get episode runtime from item
-            var item = Plugin.Instance?.GetItem(id);
-            var runtime = item?.RunTimeTicks ?? 0;
-
-            var chapters = new List<Chapter>();
-            MediaSegmentDto? previousSegment = null;
-            var maxGap = 10_000_000 * config.MaxGap;
-
-            var hasSeenIntro = false;
-            var hasSeenOutro = false;
-
-            foreach (var segment in segments)
+            if (!File.Exists(filePath))
             {
-                var isIntro = segment.Type == MediaSegmentType.Intro;
-                // Check for gap between segments
-                var gap = segment.StartTicks - (previousSegment?.EndTicks ?? 0);
-                if (gap >= maxGap)
-                {
-                    // Name the placeholder chapter based on position
-                    var placeholderName = isIntro && !hasSeenIntro ? config.Prologue :
-                                        hasSeenOutro ? config.Epilogue :
-                                        config.Main;
-
-                    chapters.Add(new Chapter
-                    {
-                        StartTime = TickToTime(previousSegment?.EndTicks ?? 0),
-                        EndTime = TickToTime(segment.StartTicks),
-                        Title = placeholderName
-                    });
-                }
-
-                // Update intro/outro flags before processing the segment
-                hasSeenIntro = isIntro || hasSeenIntro;
-
-                if (segment.Type == MediaSegmentType.Outro)
-                {
-                    hasSeenOutro = true;
-                }
-
-                var name = GetChapterName(segment.Type);
-
-                // Only add chapter if it has a name
-                if (!string.IsNullOrEmpty(name))
-                {
-                    chapters.Add(new Chapter
-                    {
-                        StartTime = TickToTime(segment.StartTicks),
-                        EndTime = TickToTime(segment.EndTicks),
-                        Title = name
-                    });
-                }
-
-                // Add final chapter if there's significant runtime remaining
-                if (hasSeenOutro && runtime > 0 && segment == segments[^1] && runtime - segment.EndTicks >= maxGap)
-                {
-                    var placeholderName = hasSeenOutro ? config.Epilogue : config.Main;
-                    chapters.Add(new Chapter
-                    {
-                        StartTime = TickToTime(segment.EndTicks),
-                        EndTime = TickToTime(runtime),
-                        Title = placeholderName
-                    });
-                }
-
-                previousSegment = segment;
+                _logger.LogWarning("Skip id ({Id}): media file not found at {Path}", id, filePath);
+                return;
             }
 
-            return chapters;
+            var chapterPath = GetChapterPath(filePath);
+            _logger.LogDebug("Writing chapters to {Path}", chapterPath);
+
+            CreateChapterXmlFile(chapterPath, chapterContent, overwrite, _logger);
+            _logger.LogDebug("Successfully created chapter file for {Id} at {Path}", id, chapterPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create chapter file for item {Id}", id);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Convert segments to a Kodi compatible Chapter entry.
+    /// </summary>
+    /// <param name="id">The ItemId.</param>
+    /// <param name="segments">The Segments.</param>
+    /// <returns>String content of chapter file.</returns>
+    public IReadOnlyList<Chapter> ToChapter(Guid id, IReadOnlyCollection<MediaSegmentDto> segments)
+    {
+        if (segments is null || segments.Count == 0)
+        {
+            return [];
         }
 
-        /// <summary>
-        /// Create Chapter string based on Action with newline. Public for tests.
-        /// </summary>
-        /// <param name="start">Start position.</param>
-        /// <param name="end">End position.</param>
-        /// <param name="name">The Chapter Name.</param>
-        /// <param name="chapterNumber">The Chapter Number.</param>
-        /// <returns>String content of chapter file.</returns>
-        public static string ToChapterString(long start, long end, string name, int chapterNumber)
-        {
-            // Convert ticks to TimeSpan for easier formatting
-            var startTime = TimeSpan.FromTicks(start);
+        var config = Plugin.Instance!.Configuration;
 
-            // Format as HH:MM:SS.ss using invariant culture for consistent formatting
-            var startFormatted = startTime.ToString(@"hh\:mm\:ss\.ff", System.Globalization.CultureInfo.InvariantCulture);
-            // Format as MKV chapter entry using provided chapter number
-            return string.Format(
-                System.Globalization.CultureInfo.InvariantCulture,
-                "CHAPTER{0}={1}\nCHAPTER{0}NAME={2}\n",
-                chapterNumber,
-                startFormatted,
-                name);
-        }
+        // Get episode runtime from item
+        var item = Plugin.Instance?.GetItem(id);
+        var runtime = item?.RunTimeTicks ?? 0;
 
-        /// <summary>
-        /// Convert a segments Type to an edl Action based on user settings.
-        /// </summary>
-        /// <param name="type">The Segments type.</param>
-        /// <returns>String content of chapter file.</returns>
-        private static string GetChapterName(MediaSegmentType type)
+        var chapters = new List<Chapter>();
+        MediaSegmentDto? previousSegment = null;
+        var maxGap = 10_000_000 * config.MaxGap;
+
+        var hasSeenIntro = false;
+        var hasSeenOutro = false;
+
+        foreach (var segment in segments)
         {
-            return type switch
+            var isIntro = segment.Type == MediaSegmentType.Intro;
+            // Check for gap between segments
+            var gap = segment.StartTicks - (previousSegment?.EndTicks ?? 0);
+            if (gap >= maxGap)
             {
-                MediaSegmentType.Intro => Plugin.Instance!.Configuration.Intro,
-                MediaSegmentType.Outro => Plugin.Instance!.Configuration.Outro,
-                MediaSegmentType.Recap => Plugin.Instance!.Configuration.Recap,
-                MediaSegmentType.Preview => Plugin.Instance!.Configuration.Preview,
-                MediaSegmentType.Commercial => Plugin.Instance!.Configuration.Commercial,
-                _ => Plugin.Instance!.Configuration.Unknown,
-            };
+                // Name the placeholder chapter based on position
+                var placeholderName = isIntro && !hasSeenIntro ? config.Prologue :
+                                    hasSeenOutro ? config.Epilogue :
+                                    config.Main;
+
+                chapters.Add(new Chapter
+                {
+                    StartTime = TickToTime(previousSegment?.EndTicks ?? 0),
+                    EndTime = TickToTime(segment.StartTicks),
+                    Title = placeholderName
+                });
+            }
+
+            // Update intro/outro flags before processing the segment
+            hasSeenIntro = isIntro || hasSeenIntro;
+
+            if (segment.Type == MediaSegmentType.Outro)
+            {
+                hasSeenOutro = true;
+            }
+
+            var name = GetChapterName(segment.Type);
+
+            // Only add chapter if it has a name
+            if (!string.IsNullOrEmpty(name))
+            {
+                chapters.Add(new Chapter
+                {
+                    StartTime = TickToTime(segment.StartTicks),
+                    EndTime = TickToTime(segment.EndTicks),
+                    Title = name
+                });
+            }
+
+            // Add final chapter if there's significant runtime remaining
+            if (hasSeenOutro && runtime > 0 && segment == segments.Last() && runtime - segment.EndTicks >= maxGap)
+            {
+                var placeholderName = hasSeenOutro ? config.Epilogue : config.Main;
+                chapters.Add(new Chapter
+                {
+                    StartTime = TickToTime(segment.EndTicks),
+                    EndTime = TickToTime(runtime),
+                    Title = placeholderName
+                });
+            }
+
+            previousSegment = segment;
         }
 
-        /// <summary>
-        /// Given the path to an episode, return the path to the associated chapters Chapter file.
-        /// </summary>
-        /// <param name="mediaPath">Full path to episode.</param>
-        /// <returns>Full path to chapters Chapter file.</returns>
-        public static string GetChapterPath(string mediaPath)
+        return chapters;
+    }
+
+    private string GetChapterName(MediaSegmentType type)
+    {
+        return type switch
         {
-            var filename = Path.GetFileNameWithoutExtension(mediaPath);
-            return Path.Combine(Path.GetDirectoryName(mediaPath)!, $"{filename}_chapters.xml");
+            MediaSegmentType.Intro => Plugin.Instance!.Configuration.Intro,
+            MediaSegmentType.Outro => Plugin.Instance!.Configuration.Outro,
+            MediaSegmentType.Recap => Plugin.Instance!.Configuration.Recap,
+            MediaSegmentType.Preview => Plugin.Instance!.Configuration.Preview,
+            MediaSegmentType.Commercial => Plugin.Instance!.Configuration.Commercial,
+            _ => Plugin.Instance!.Configuration.Unknown,
+        };
+    }
+
+    private string GetChapterPath(string mediaPath)
+    {
+        var filename = Path.GetFileNameWithoutExtension(mediaPath);
+        return Path.Combine(Path.GetDirectoryName(mediaPath)!, $"{filename}_chapters.xml");
+    }
+
+    private string TickToTime(long ticks)
+    {
+        var timeSpan = TimeSpan.FromTicks(ticks);
+        return timeSpan.ToString(@"hh\:mm\:ss\.ff", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private void CreateChapterXmlFile(string filename, IReadOnlyList<Chapter> chapters, bool overwrite, ILogger? logger = null)
+    {
+        ArgumentNullException.ThrowIfNull(filename);
+
+        if (chapters is null || chapters.Count == 0)
+        {
+            logger?.LogDebug("No chapters provided for file {Filename}", filename);
+            return;
         }
 
-        private static string TickToTime(long ticks)
+        if (File.Exists(filename))
         {
-            var timeSpan = TimeSpan.FromTicks(ticks);
-            return timeSpan.ToString(@"hh\:mm\:ss\.ff", System.Globalization.CultureInfo.InvariantCulture);
+            if (!overwrite)
+            {
+                logger?.LogDebug("Skipping existing chapter file {Filename} (overwrite disabled)", filename);
+                return;
+            }
+
+            logger?.LogDebug("Overwriting existing chapter file {Filename}", filename);
         }
+
+        var directoryPath = Path.GetDirectoryName(filename)!;
+        Directory.CreateDirectory(directoryPath);
+        logger?.LogDebug("Ensuring directory exists: {Directory}", directoryPath);
+
+        // Generate random UIDs for the Edition and Chapters
+        long editionUID = GenerateUID();
+        long[] chapterUIDs = [.. Enumerable.Range(0, chapters.Count).Select(_ => GenerateUID())];
+
+        logger?.LogDebug("Writing {Count} chapters to {Filename}", chapters.Count, filename);
+
+        // Create an XML writer with appropriate settings
+        XmlWriterSettings settings = new XmlWriterSettings
+        {
+            Indent = true,
+            IndentChars = "  ",
+            NewLineOnAttributes = false
+        };
+
+        using XmlWriter writer = XmlWriter.Create(filename, settings);
+
+        // Write the XML structure using constants for element names
+        writer.WriteStartDocument();
+        writer.WriteStartElement("Chapters");
+        {
+            writer.WriteStartElement("EditionEntry");
+            {
+                writer.WriteElementString("EditionUID", editionUID.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                writer.WriteElementString("EditionFlagDefault", "1");  // Add default flag
+                writer.WriteElementString("EditionFlagHidden", "0");   // Add hidden flag
+
+                // Write each chapter
+                for (int i = 0; i < chapters.Count; i++)
+                {
+                    WriteChapterAtom(writer, chapters[i], chapterUIDs[i]);
+                }
+            }
+
+            writer.WriteEndElement(); // End EditionEntry
+        }
+
+        writer.WriteEndElement(); // End Chapters
+        writer.WriteEndDocument();
+    }
+
+    private void WriteChapterAtom(XmlWriter writer, Chapter chapter, long chapterUID)
+    {
+        writer.WriteStartElement("ChapterAtom");
+        {
+            writer.WriteElementString("ChapterUID", chapterUID.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            writer.WriteElementString("ChapterFlagHidden", "0");
+            writer.WriteElementString("ChapterFlagEnabled", "1");
+            writer.WriteElementString("ChapterTimeStart", chapter.StartTime);
+            writer.WriteElementString("ChapterTimeEnd", chapter.EndTime);
+
+            writer.WriteStartElement("ChapterDisplay");
+            {
+                writer.WriteElementString("ChapterString", chapter.Title);
+                writer.WriteElementString("ChapterLanguage", "und");
+            }
+
+            writer.WriteEndElement(); // End ChapterDisplay
+        }
+
+        writer.WriteEndElement(); // End ChapterAtom
+    }
+
+    // Method to generate a random UID (Matroska recommends 64-bit unsigned integers)
+    private long GenerateUID()
+    {
+        using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+        byte[] buffer = new byte[8];
+        rng.GetBytes(buffer);
+        return BitConverter.ToInt64(buffer, 0) & 0x7FFFFFFFFFFFFFFF; // Ensure positive number
     }
 }
