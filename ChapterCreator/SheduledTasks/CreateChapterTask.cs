@@ -35,7 +35,7 @@ public class CreateChapterTask(
     /// <summary>
     /// Gets the task name.
     /// </summary>
-    public string Name => "Create Chapters";
+    public string Name => "Create Chapter XMLs";
 
     /// <summary>
     /// Gets the task category.
