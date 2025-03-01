@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using ChapterCreator.Data;
 using MediaBrowser.Model.MediaSegments;
 
-namespace ChapterCreator;
+namespace ChapterCreator.Managers;
 
 /// <summary>
 /// Interface for chapter management operations.

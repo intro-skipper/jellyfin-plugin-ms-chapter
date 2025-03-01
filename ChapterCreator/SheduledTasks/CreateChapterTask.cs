@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using ChapterCreator.Managers;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.MediaSegments;
 using MediaBrowser.Model.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace ChapterCreator.SheduledTasks;
 
@@ -15,22 +17,22 @@ namespace ChapterCreator.SheduledTasks;
 /// <remarks>
 /// Initializes a new instance of the <see cref="CreateChapterTask"/> class.
 /// </remarks>
+/// <param name="loggerFactory">Logger factory.</param>
 /// <param name="libraryManager">Library manager.</param>
 /// <param name="mediaSegmentManager">MediaSegment manager.</param>
 /// <param name="chapterManager">ChapterManager.</param>
-/// <param name="queueManager">QueueManager.</param>
 public class CreateChapterTask(
+    ILoggerFactory loggerFactory,
     ILibraryManager libraryManager,
     IMediaSegmentManager mediaSegmentManager,
-    IChapterManager chapterManager,
-    IQueueManager queueManager) : IScheduledTask
+    IChapterManager chapterManager) : IScheduledTask
 {
+    private readonly ILoggerFactory _loggerFactory = loggerFactory;
     private readonly ILibraryManager _libraryManager = libraryManager;
 
     private readonly IMediaSegmentManager _mediaSegmentManager = mediaSegmentManager;
 
     private readonly IChapterManager _chapterManager = chapterManager;
-    private readonly IQueueManager _queueManager = queueManager;
 
     /// <summary>
     /// Gets the task name.
@@ -69,7 +71,7 @@ public class CreateChapterTask(
 
         var segmentsList = new List<MediaSegmentDto>();
         // get ItemIds
-        var mediaItems = _queueManager.GetMediaItems();
+        var mediaItems = new QueueManager(_loggerFactory.CreateLogger<QueueManager>(), _libraryManager).GetMediaItems();
         // get MediaSegments from itemIds
         foreach (var kvp in mediaItems)
         {

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
     <head>
         <meta charset="utf-8" />
@@ -140,7 +140,6 @@
                 document.querySelector("#TemplateConfigForm").addEventListener("submit", function (e) {
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(TemplateConfig.pluginUniqueId).then(function (config) {
-                        config.Unknown = document.querySelector("#Unknown").value;
                         config.Intro = document.querySelector("#Intro").value;
                         config.Outro = document.querySelector("#Outro").value;
                         config.Preview = document.querySelector("#Preview").value;

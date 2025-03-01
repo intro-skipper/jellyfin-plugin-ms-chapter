@@ -4,12 +4,15 @@ using System.ComponentModel.DataAnnotations;
 using System.Net.Mime;
 using System.Threading;
 using System.Threading.Tasks;
+using ChapterCreator.Managers;
 using ChapterCreator.SheduledTasks;
 using MediaBrowser.Controller;
+using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.MediaSegments;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace ChapterCreator.Controllers;
 
@@ -19,21 +22,24 @@ namespace ChapterCreator.Controllers;
 /// <remarks>
 /// Initializes a new instance of the <see cref="ChapterController"/> class.
 /// </remarks>
+/// <param name="loggerFactory">Logger.</param>
+/// <param name="libraryManager">LibraryManager.</param>
 /// <param name="mediaSegmentManager">MediaSegmentsManager.</param>
 /// <param name="chapterManager">ChapterManager.</param>
-/// <param name="queueManager">QueueManager.</param>
 [Authorize(Policy = "RequiresElevation")]
 [ApiController]
 [Produces(MediaTypeNames.Application.Json)]
 [Route("PluginChapter")]
 public class ChapterController(
+    ILoggerFactory loggerFactory,
+    ILibraryManager libraryManager,
     IMediaSegmentManager mediaSegmentManager,
-    IChapterManager chapterManager,
-    IQueueManager queueManager) : ControllerBase
+    IChapterManager chapterManager) : ControllerBase
 {
+    private readonly ILoggerFactory _loggerFactory = loggerFactory;
+    private readonly ILibraryManager _libraryManager = libraryManager;
     private readonly IMediaSegmentManager _mediaSegmentManager = mediaSegmentManager;
     private readonly IChapterManager _chapterManager = chapterManager;
-    private readonly IQueueManager _queueManager = queueManager;
 
     /// <summary>
     /// Plugin meta endpoint.
@@ -63,7 +69,7 @@ public class ChapterController(
     {
         var segmentsList = new List<MediaSegmentDto>();
         // get ItemIds
-        var mediaItems = _queueManager.GetMediaItemsById([itemId]);
+        var mediaItems = new QueueManager(_loggerFactory.CreateLogger<QueueManager>(), _libraryManager).GetMediaItemsById([itemId]);
         // get MediaSegments from itemIds
         foreach (var kvp in mediaItems)
         {
@@ -98,7 +104,7 @@ public class ChapterController(
 
         var segmentsList = new List<MediaSegmentDto>();
         // get ItemIds
-        var mediaItems = _queueManager.GetMediaItemsById(itemIds);
+        var mediaItems = new QueueManager(_loggerFactory.CreateLogger<QueueManager>(), _libraryManager).GetMediaItemsById(itemIds);
         // get MediaSegments from itemIds
         foreach (var kvp in mediaItems)
         {

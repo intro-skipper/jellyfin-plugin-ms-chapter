@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Xml;
+using ChapterCreator.Configuration;
 using ChapterCreator.Data;
 using Jellyfin.Data.Enums;
 using MediaBrowser.Model.MediaSegments;
 using Microsoft.Extensions.Logging;
 
-namespace ChapterCreator;
+namespace ChapterCreator.Managers;
 
 /// <summary>
 /// ChapterManager class.
@@ -20,6 +21,17 @@ namespace ChapterCreator;
 public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
 {
     private readonly ILogger<ChapterManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly PluginConfiguration _configuration = new();
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ChapterManager"/> class.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
+    /// <param name="configuration">The plugin configuration. If null, will try to use Plugin.Instance.Configuration or create a new one.</param>
+    public ChapterManager(ILogger<ChapterManager> logger, PluginConfiguration? configuration = null) : this(logger)
+    {
+        _configuration = configuration ?? Plugin.Instance?.Configuration ?? new PluginConfiguration();
+    }
 
     /// <summary>
     /// Logs the configuration that will be used during Chapter file creation.
@@ -104,7 +116,7 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
             return [];
         }
 
-        var config = Plugin.Instance!.Configuration;
+        var config = _configuration;
 
         // Get episode runtime from item
         var item = Plugin.Instance?.GetItem(id);
@@ -180,28 +192,20 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
     {
         return type switch
         {
-            MediaSegmentType.Intro => Plugin.Instance!.Configuration.Intro,
-            MediaSegmentType.Outro => Plugin.Instance!.Configuration.Outro,
-            MediaSegmentType.Recap => Plugin.Instance!.Configuration.Recap,
-            MediaSegmentType.Preview => Plugin.Instance!.Configuration.Preview,
-            MediaSegmentType.Commercial => Plugin.Instance!.Configuration.Commercial,
-            _ => Plugin.Instance!.Configuration.Unknown,
+            MediaSegmentType.Intro => _configuration.Intro,
+            MediaSegmentType.Outro => _configuration.Outro,
+            MediaSegmentType.Recap => _configuration.Recap,
+            MediaSegmentType.Preview => _configuration.Preview,
+            MediaSegmentType.Commercial => _configuration.Commercial,
+            _ => _configuration.Unknown,
         };
     }
 
-    private string GetChapterPath(string mediaPath)
-    {
-        var filename = Path.GetFileNameWithoutExtension(mediaPath);
-        return Path.Combine(Path.GetDirectoryName(mediaPath)!, $"{filename}_chapters.xml");
-    }
+    private static string GetChapterPath(string mediaPath) => Path.Combine(Path.GetDirectoryName(mediaPath)!, $"{Path.GetFileNameWithoutExtension(mediaPath)}_chapters.xml");
 
-    private string TickToTime(long ticks)
-    {
-        var timeSpan = TimeSpan.FromTicks(ticks);
-        return timeSpan.ToString(@"hh\:mm\:ss\.ff", System.Globalization.CultureInfo.InvariantCulture);
-    }
+    private static string TickToTime(long ticks) => TimeSpan.FromTicks(ticks).ToString(@"hh\:mm\:ss\.ff", System.Globalization.CultureInfo.InvariantCulture);
 
-    private void CreateChapterXmlFile(string filename, IReadOnlyList<Chapter> chapters, bool overwrite, ILogger? logger = null)
+    private static void CreateChapterXmlFile(string filename, IReadOnlyList<Chapter> chapters, bool overwrite, ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(filename);
 
@@ -266,7 +270,7 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
         writer.WriteEndDocument();
     }
 
-    private void WriteChapterAtom(XmlWriter writer, Chapter chapter, long chapterUID)
+    private static void WriteChapterAtom(XmlWriter writer, Chapter chapter, long chapterUID)
     {
         writer.WriteStartElement("ChapterAtom");
         {
@@ -289,7 +293,7 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
     }
 
     // Method to generate a random UID (Matroska recommends 64-bit unsigned integers)
-    private long GenerateUID()
+    private static long GenerateUID()
     {
         using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
         byte[] buffer = new byte[8];

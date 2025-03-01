@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using ChapterCreator.Managers;
 using MediaBrowser.Model.MediaSegments;
 
 namespace ChapterCreator.SheduledTasks;
