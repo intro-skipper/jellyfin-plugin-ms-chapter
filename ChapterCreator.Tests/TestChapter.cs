@@ -3,7 +3,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using ChapterCreator.Configuration;
 using ChapterCreator.Managers;
-using Jellyfin.Data.Enums;
+using Jellyfin.Database.Implementations.Enums;
 using MediaBrowser.Model.MediaSegments;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;

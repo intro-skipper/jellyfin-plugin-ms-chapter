@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using ChapterCreator.Data;
 using Jellyfin.Data.Enums;
+using Jellyfin.Database.Implementations.Enums;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
@@ -61,36 +61,6 @@ public class QueueManager(ILogger<QueueManager> logger, ILibraryManager libraryM
             catch (Exception ex)
             {
                 _logger.LogError("Failed to enqueue items from library {Name}: {Exception}", folder.Name, ex);
-            }
-        }
-
-        return new Dictionary<Guid, List<QueuedMedia>>(_queuedMedia);
-    }
-
-    /// <summary>
-    /// Gets media items based on given itemId. Skips all block lists.
-    /// </summary>
-    /// <param name="itemIds">All item ids to lookup.</param>
-    /// <returns>Queued media items.</returns>
-    public IReadOnlyDictionary<Guid, List<QueuedMedia>> GetMediaItemsById(Guid[] itemIds)
-    {
-        foreach (var item in itemIds)
-        {
-            var bitem = _libraryManager.GetItemById(item);
-            if (bitem != null)
-            {
-                if (bitem is Episode episode)
-                {
-                    QueueEpisode(episode);
-                }
-
-                if (bitem is Movie movie)
-                {
-                    foreach (var source in movie.GetMediaSources(false))
-                    {
-                        QueueMovie(movie, source);
-                    }
-                }
             }
         }
 
@@ -318,38 +288,5 @@ public class QueueManager(ILogger<QueueManager> logger, ILibraryManager libraryM
             Path = source.Path,
             IsEpisode = false,
         });
-    }
-
-    /// <summary>
-    /// Verify that a collection of queued media items still exist in Jellyfin and in storage.
-    /// This is done to ensure that we don't use items that were deleted between the call to GetMediaItems() and popping them from the queue.
-    /// </summary>
-    /// <param name="candidates">Queued media items.</param>
-    /// <returns>Media items that have been verified to exist in Jellyfin and in storage.</returns>
-    public IReadOnlyCollection<QueuedMedia>
-        VerifyQueue(IReadOnlyCollection<QueuedMedia> candidates)
-    {
-        var verified = new List<QueuedMedia>();
-
-        foreach (var candidate in candidates)
-        {
-            try
-            {
-                if (File.Exists(candidate.Path))
-                {
-                    verified.Add(candidate);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogDebug(
-                    "Skipping queue of {Name} ({Id}): {Exception}",
-                    candidate.Name,
-                    candidate.ItemId,
-                    ex);
-            }
-        }
-
-        return verified;
     }
 }

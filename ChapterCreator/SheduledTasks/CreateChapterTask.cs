@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using ChapterCreator.Managers;
-using MediaBrowser.Controller;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.MediaSegments;
+using MediaBrowser.Model.Configuration;
 using MediaBrowser.Model.MediaSegments;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
@@ -77,7 +78,13 @@ public class CreateChapterTask(
         {
             foreach (var media in kvp.Value)
             {
-                segmentsList.AddRange(await _mediaSegmentManager.GetSegmentsAsync(media.ItemId, null, true).ConfigureAwait(false));
+                var item = Plugin.Instance!.GetItem(media.ItemId);
+                if (item is null)
+                {
+                    continue;
+                }
+
+                segmentsList.AddRange(await _mediaSegmentManager.GetSegmentsAsync(item, null, new LibraryOptions(), true).ConfigureAwait(false));
             }
         }
 

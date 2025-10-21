@@ -19,7 +19,7 @@ namespace ChapterCreator
     public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
         private readonly ILibraryManager _libraryManager;
-        private readonly IItemRepository _itemRepository;
+        private readonly IChapterRepository _chapterRepository;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Plugin"/> class.
@@ -27,18 +27,18 @@ namespace ChapterCreator
         /// <param name="applicationPaths">Instance of the <see cref="IApplicationPaths"/> interface.</param>
         /// <param name="xmlSerializer">Instance of the <see cref="IXmlSerializer"/> interface.</param>
         /// <param name="libraryManager">Library manager.</param>
-        /// <param name="itemRepository">Item repository.</param>
+        /// <param name="chapterRepository">Chapter repository.</param>
         public Plugin(
             IApplicationPaths applicationPaths,
             IXmlSerializer xmlSerializer,
             ILibraryManager libraryManager,
-            IItemRepository itemRepository)
+            IChapterRepository chapterRepository)
             : base(applicationPaths, xmlSerializer)
         {
             Instance = this;
 
             _libraryManager = libraryManager;
-            _itemRepository = itemRepository;
+            _chapterRepository = chapterRepository;
         }
 
         /// <inheritdoc />
@@ -85,15 +85,6 @@ namespace ChapterCreator
         /// </summary>
         /// <param name="id">Item id.</param>
         /// <returns>List of chapters.</returns>
-        internal IReadOnlyList<ChapterInfo> GetChapters(Guid id)
-        {
-            var item = GetItem(id);
-            if (item == null)
-            {
-                return [];
-            }
-
-            return _itemRepository.GetChapters(item);
-        }
+        internal IReadOnlyList<ChapterInfo> GetChapters(Guid id) => _chapterRepository.GetChapters(id);
     }
 }

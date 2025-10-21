@@ -6,13 +6,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using ChapterCreator.Managers;
 using ChapterCreator.SheduledTasks;
-using MediaBrowser.Controller;
-using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.MediaSegments;
+using MediaBrowser.Model.Configuration;
 using MediaBrowser.Model.MediaSegments;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 
 namespace ChapterCreator.Controllers;
 
@@ -22,8 +21,6 @@ namespace ChapterCreator.Controllers;
 /// <remarks>
 /// Initializes a new instance of the <see cref="ChapterController"/> class.
 /// </remarks>
-/// <param name="loggerFactory">Logger.</param>
-/// <param name="libraryManager">LibraryManager.</param>
 /// <param name="mediaSegmentManager">MediaSegmentsManager.</param>
 /// <param name="chapterManager">ChapterManager.</param>
 [Authorize(Policy = "RequiresElevation")]
@@ -31,13 +28,9 @@ namespace ChapterCreator.Controllers;
 [Produces(MediaTypeNames.Application.Json)]
 [Route("PluginChapter")]
 public class ChapterController(
-    ILoggerFactory loggerFactory,
-    ILibraryManager libraryManager,
     IMediaSegmentManager mediaSegmentManager,
     IChapterManager chapterManager) : ControllerBase
 {
-    private readonly ILoggerFactory _loggerFactory = loggerFactory;
-    private readonly ILibraryManager _libraryManager = libraryManager;
     private readonly IMediaSegmentManager _mediaSegmentManager = mediaSegmentManager;
     private readonly IChapterManager _chapterManager = chapterManager;
 
@@ -68,16 +61,8 @@ public class ChapterController(
         [FromRoute, Required] Guid itemId)
     {
         var segmentsList = new List<MediaSegmentDto>();
-        // get ItemIds
-        var mediaItems = new QueueManager(_loggerFactory.CreateLogger<QueueManager>(), _libraryManager).GetMediaItemsById([itemId]);
-        // get MediaSegments from itemIds
-        foreach (var kvp in mediaItems)
-        {
-            foreach (var media in kvp.Value)
-            {
-                segmentsList.AddRange(await _mediaSegmentManager.GetSegmentsAsync(media.ItemId, null, true).ConfigureAwait(false));
-            }
-        }
+        var item = Plugin.Instance!.GetItem(itemId) ?? throw new ArgumentNullException(nameof(itemId), "Item not found");
+        segmentsList.AddRange(await _mediaSegmentManager.GetSegmentsAsync(item, null, new LibraryOptions(), true).ConfigureAwait(false));
 
         var rawstring = _chapterManager.ToChapter(itemId, segmentsList);
 
@@ -100,18 +85,24 @@ public class ChapterController(
     public async Task<OkResult> GenerateData(
         [FromBody, Required] Guid[] itemIds)
     {
+        if (itemIds is null || itemIds.Length == 0)
+        {
+            throw new ArgumentNullException(nameof(itemIds));
+        }
+
         var baseChapterTask = new BaseChapterTask(_chapterManager);
 
         var segmentsList = new List<MediaSegmentDto>();
-        // get ItemIds
-        var mediaItems = new QueueManager(_loggerFactory.CreateLogger<QueueManager>(), _libraryManager).GetMediaItemsById(itemIds);
-        // get MediaSegments from itemIds
-        foreach (var kvp in mediaItems)
+
+        foreach (var id in itemIds)
         {
-            foreach (var media in kvp.Value)
+            var item = Plugin.Instance!.GetItem(id);
+            if (item is null)
             {
-                segmentsList.AddRange(await _mediaSegmentManager.GetSegmentsAsync(media.ItemId, null, true).ConfigureAwait(false));
+                continue;
             }
+
+            segmentsList.AddRange(await _mediaSegmentManager.GetSegmentsAsync(item, null, new LibraryOptions(), true).ConfigureAwait(false));
         }
 
         IProgress<double> progress = new Progress<double>();

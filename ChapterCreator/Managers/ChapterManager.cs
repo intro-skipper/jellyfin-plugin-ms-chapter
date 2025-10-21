@@ -5,7 +5,7 @@ using System.Linq;
 using System.Xml;
 using ChapterCreator.Configuration;
 using ChapterCreator.Data;
-using Jellyfin.Data.Enums;
+using Jellyfin.Database.Implementations.Enums;
 using MediaBrowser.Model.MediaSegments;
 using Microsoft.Extensions.Logging;
 
