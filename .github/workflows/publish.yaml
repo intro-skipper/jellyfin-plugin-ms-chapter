@@ -16,7 +16,7 @@ jobs:
       - name: Read version from variable
         id: read-version
         run: |
-          NEW_FILE_VERSION=0.4.2
+          NEW_FILE_VERSION=0.5.0
           echo "NEW_FILE_VERSION=${NEW_FILE_VERSION}" >> $GITHUB_ENV
           GIT_HASH=$(git rev-parse --short HEAD)
           echo "GIT_HASH=${GIT_HASH}" >> $GITHUB_ENV
@@ -33,7 +33,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 9.0.x
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
