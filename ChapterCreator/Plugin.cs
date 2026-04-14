@@ -21,7 +21,7 @@ namespace ChapterCreator
     /// </summary>
     public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
-        private const string IntroskipperDataDir = "introskipper";
+        private const string IntroSkipperDataDir = "introskipper";
         private const string ChaptersSuffix = "_chapters";
 
         private readonly ILibraryManager _libraryManager;
@@ -65,7 +65,7 @@ namespace ChapterCreator
         /// <summary>
         /// Gets the path to the centralized chapters folder inside the introskipper data directory.
         /// </summary>
-        public string ChaptersFolderPath => Path.Join(ApplicationPaths.DataPath, IntroskipperDataDir, "chapters");
+        public string ChaptersFolderPath => Path.Join(ApplicationPaths.DataPath, IntroSkipperDataDir, "chapters");
 
         /// <inheritdoc />
         public IEnumerable<PluginPageInfo> GetPages()

@@ -92,7 +92,7 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
                 return;
             }
 
-            var chapterPath = GetChapterPath(filePath, id);
+            var chapterPath = GetChapterPath(filePath, id, _logger);
             _logger.LogDebug("Writing chapters to {Path}", chapterPath);
 
             CreateChapterXmlFile(chapterPath, chapterContent, overwrite, _logger);
@@ -203,7 +203,7 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
         };
     }
 
-    private static string GetChapterPath(string mediaPath, Guid id)
+    private static string GetChapterPath(string mediaPath, Guid id, ILogger? logger = null)
     {
         var config = Plugin.Instance?.Configuration;
         if (config?.UseChaptersFolder == true)
@@ -218,15 +218,21 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
         {
             resolvedPath = File.ResolveLinkTarget(mediaPath, returnFinalTarget: true)?.FullName ?? mediaPath;
         }
-        catch (IOException)
+        catch (IOException ex)
         {
+            logger?.LogDebug(ex, "Could not resolve symlink for {Path}, using original path", mediaPath);
             resolvedPath = mediaPath;
         }
 
         var dir = Path.GetDirectoryName(resolvedPath);
         if (string.IsNullOrEmpty(dir))
         {
-            return Path.Combine(Path.GetDirectoryName(mediaPath) ?? string.Empty, $"{Path.GetFileNameWithoutExtension(mediaPath)}{ChapterFileSuffix}.xml");
+            dir = Path.GetDirectoryName(mediaPath);
+        }
+
+        if (string.IsNullOrEmpty(dir))
+        {
+            throw new InvalidOperationException($"Unable to determine directory for media path '{mediaPath}'");
         }
 
         return Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(resolvedPath)}{ChapterFileSuffix}.xml");
