@@ -90,7 +90,7 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
                 return;
             }
 
-            var chapterPath = GetChapterPath(filePath);
+            var chapterPath = GetChapterPath(filePath, id);
             _logger.LogDebug("Writing chapters to {Path}", chapterPath);
 
             CreateChapterXmlFile(chapterPath, chapterContent, overwrite, _logger);
@@ -201,7 +201,17 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
         };
     }
 
-    private static string GetChapterPath(string mediaPath) => Path.Combine(Path.GetDirectoryName(mediaPath)!, $"{Path.GetFileNameWithoutExtension(mediaPath)}_chapters.xml");
+    private static string GetChapterPath(string mediaPath, Guid id)
+    {
+        var config = Plugin.Instance?.Configuration;
+        if (config?.UseChaptersFolder == true && Plugin.Instance is not null)
+        {
+            var chaptersFolder = Plugin.Instance.ChaptersFolderPath;
+            return Path.Combine(chaptersFolder, $"{id}_chapters.xml");
+        }
+
+        return Path.Combine(Path.GetDirectoryName(mediaPath)!, $"{Path.GetFileNameWithoutExtension(mediaPath)}_chapters.xml");
+    }
 
     private static string TickToTime(long ticks) => TimeSpan.FromTicks(ticks).ToString(@"hh\:mm\:ss\.ff", System.Globalization.CultureInfo.InvariantCulture);
 
