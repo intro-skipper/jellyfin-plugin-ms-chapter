@@ -70,6 +70,9 @@ public class CreateChapterTask(
 
         var baseChapterTask = new BaseChapterTask(_chapterManager);
 
+        // Migrate chapter files if the UseChaptersFolder setting changed since the last run.
+        Plugin.Instance!.ApplyChaptersFolderMigrationIfNeeded();
+
         var segmentsList = new List<MediaSegmentDto>();
         // get ItemIds
         var mediaItems = new QueueManager(_loggerFactory.CreateLogger<QueueManager>(), _libraryManager).GetMediaItems();

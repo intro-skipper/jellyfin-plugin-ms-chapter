@@ -27,6 +27,7 @@ namespace ChapterCreator
         private readonly ILibraryManager _libraryManager;
         private readonly IChapterRepository _chapterRepository;
         private readonly ILogger<Plugin> _logger;
+        private bool _lastAppliedUseChaptersFolder;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Plugin"/> class.
@@ -49,6 +50,7 @@ namespace ChapterCreator
             _libraryManager = libraryManager;
             _chapterRepository = chapterRepository;
             _logger = logger;
+            _lastAppliedUseChaptersFolder = Configuration.UseChaptersFolder;
         }
 
         /// <inheritdoc />
@@ -83,25 +85,32 @@ namespace ChapterCreator
         /// <inheritdoc />
         public override void UpdateConfiguration(BasePluginConfiguration configuration)
         {
-            var previousUseChaptersFolder = Configuration.UseChaptersFolder;
-
             base.UpdateConfiguration(configuration);
+        }
 
-            if (configuration is PluginConfiguration pluginConfig)
+        /// <summary>
+        /// Checks whether the <see cref="PluginConfiguration.UseChaptersFolder"/> setting changed since the
+        /// last time a scheduled task ran and, if so, migrates existing chapter files to the new location.
+        /// Call this at the start of the scheduled task before writing any new files.
+        /// </summary>
+        internal void ApplyChaptersFolderMigrationIfNeeded()
+        {
+            var current = Configuration.UseChaptersFolder;
+            if (current == _lastAppliedUseChaptersFolder)
             {
-                var newValue = pluginConfig.UseChaptersFolder;
-                if (newValue != previousUseChaptersFolder)
-                {
-                    if (newValue)
-                    {
-                        MigrateToChaptersFolder();
-                    }
-                    else
-                    {
-                        MigrateFromChaptersFolder();
-                    }
-                }
+                return;
             }
+
+            if (current)
+            {
+                MigrateToChaptersFolder();
+            }
+            else
+            {
+                MigrateFromChaptersFolder();
+            }
+
+            _lastAppliedUseChaptersFolder = current;
         }
 
         internal BaseItem? GetItem(Guid id)
