@@ -144,20 +144,42 @@ namespace ChapterCreator
                     continue;
                 }
 
-                var oldPath = Path.Combine(
-                    Path.GetDirectoryName(item.Path)!,
-                    $"{Path.GetFileNameWithoutExtension(item.Path)}_chapters.xml");
+                // Resolve any VFS symlink to locate the chapter file next to the real media.
+                string realPath;
+                try
+                {
+                    realPath = File.ResolveLinkTarget(item.Path, returnFinalTarget: true)?.FullName ?? item.Path;
+                }
+                catch (IOException ex)
+                {
+                    _logger.LogWarning(ex, "Could not resolve symlink for item {Id} at {Path}, skipping", item.Id, item.Path);
+                    continue;
+                }
+
+                var dir = Path.GetDirectoryName(realPath);
+                if (string.IsNullOrEmpty(dir))
+                {
+                    _logger.LogWarning("Could not determine directory for item {Id} at {Path}, skipping", item.Id, realPath);
+                    continue;
+                }
+
+                var oldPath = Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(realPath)}{ChaptersSuffix}.xml");
 
                 if (!File.Exists(oldPath))
                 {
                     continue;
                 }
 
-                var newPath = Path.Combine(ChaptersFolderPath, $"{item.Id}_chapters.xml");
+                var newPath = Path.Combine(ChaptersFolderPath, $"{item.Id}{ChaptersSuffix}.xml");
 
                 try
                 {
                     Directory.CreateDirectory(ChaptersFolderPath);
+                    if (File.Exists(newPath))
+                    {
+                        _logger.LogDebug("Overwriting existing chapter file at destination: {New}", newPath);
+                    }
+
                     File.Move(oldPath, newPath, overwrite: true);
                     _logger.LogDebug("Moved chapter file for item {Id}: {Old} -> {New}", item.Id, oldPath, newPath);
                 }
@@ -177,10 +199,10 @@ namespace ChapterCreator
                 return;
             }
 
-            foreach (var file in Directory.GetFiles(ChaptersFolderPath, "*_chapters.xml"))
+            foreach (var file in Directory.GetFiles(ChaptersFolderPath, $"*{ChaptersSuffix}.xml"))
             {
                 var stem = Path.GetFileNameWithoutExtension(file); // "{guid}_chapters"
-                var idStr = stem[..^"_chapters".Length];
+                var idStr = stem[..^ChaptersSuffix.Length];
 
                 if (!Guid.TryParse(idStr, out var id))
                 {
@@ -195,12 +217,34 @@ namespace ChapterCreator
                     continue;
                 }
 
-                var newPath = Path.Combine(
-                    Path.GetDirectoryName(item.Path)!,
-                    $"{Path.GetFileNameWithoutExtension(item.Path)}_chapters.xml");
+                // Resolve any VFS symlink so the chapter file lands next to the real media.
+                string realPath;
+                try
+                {
+                    realPath = File.ResolveLinkTarget(item.Path, returnFinalTarget: true)?.FullName ?? item.Path;
+                }
+                catch (IOException ex)
+                {
+                    _logger.LogWarning(ex, "Could not resolve symlink for item {Id} at {Path}, skipping", id, item.Path);
+                    continue;
+                }
+
+                var dir = Path.GetDirectoryName(realPath);
+                if (string.IsNullOrEmpty(dir))
+                {
+                    _logger.LogWarning("Could not determine directory for item {Id} at {Path}, skipping", id, realPath);
+                    continue;
+                }
+
+                var newPath = Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(realPath)}{ChaptersSuffix}.xml");
 
                 try
                 {
+                    if (File.Exists(newPath))
+                    {
+                        _logger.LogDebug("Overwriting existing chapter file at destination: {New}", newPath);
+                    }
+
                     File.Move(file, newPath, overwrite: true);
                     _logger.LogDebug("Moved chapter file for item {Id}: {Old} -> {New}", id, file, newPath);
                 }

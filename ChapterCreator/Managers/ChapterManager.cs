@@ -20,6 +20,8 @@ namespace ChapterCreator.Managers;
 /// <param name="logger">The logger instance.</param>
 public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
 {
+    private const string ChapterFileSuffix = "_chapters";
+
     private readonly ILogger<ChapterManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly PluginConfiguration _configuration = new();
 
@@ -204,13 +206,30 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
     private static string GetChapterPath(string mediaPath, Guid id)
     {
         var config = Plugin.Instance?.Configuration;
-        if (config?.UseChaptersFolder == true && Plugin.Instance is not null)
+        if (config?.UseChaptersFolder == true)
         {
-            var chaptersFolder = Plugin.Instance.ChaptersFolderPath;
-            return Path.Combine(chaptersFolder, $"{id}_chapters.xml");
+            return Path.Combine(Plugin.Instance!.ChaptersFolderPath, $"{id}{ChapterFileSuffix}.xml");
         }
 
-        return Path.Combine(Path.GetDirectoryName(mediaPath)!, $"{Path.GetFileNameWithoutExtension(mediaPath)}_chapters.xml");
+        // Resolve any VFS symlink so the chapter file is placed next to the real media file.
+        // Fall back to the original path if resolution fails (e.g. broken symlink).
+        string resolvedPath;
+        try
+        {
+            resolvedPath = File.ResolveLinkTarget(mediaPath, returnFinalTarget: true)?.FullName ?? mediaPath;
+        }
+        catch (IOException)
+        {
+            resolvedPath = mediaPath;
+        }
+
+        var dir = Path.GetDirectoryName(resolvedPath);
+        if (string.IsNullOrEmpty(dir))
+        {
+            return Path.Combine(Path.GetDirectoryName(mediaPath) ?? string.Empty, $"{Path.GetFileNameWithoutExtension(mediaPath)}{ChapterFileSuffix}.xml");
+        }
+
+        return Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(resolvedPath)}{ChapterFileSuffix}.xml");
     }
 
     private static string TickToTime(long ticks) => TimeSpan.FromTicks(ticks).ToString(@"hh\:mm\:ss\.ff", System.Globalization.CultureInfo.InvariantCulture);
