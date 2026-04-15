@@ -20,8 +20,6 @@ namespace ChapterCreator.Managers;
 /// <param name="logger">The logger instance.</param>
 public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
 {
-    private const string ChapterFileSuffix = "_chapters";
-
     private readonly ILogger<ChapterManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly PluginConfiguration _configuration = new();
 
@@ -208,7 +206,7 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
         var config = Plugin.Instance?.Configuration;
         if (config?.UseChaptersFolder == true)
         {
-            return Path.Combine(Plugin.Instance!.ChaptersFolderPath, $"{id}{ChapterFileSuffix}.xml");
+            return Path.Combine(Plugin.Instance!.ChaptersFolderPath, $"{id}{Constants.ChapterFileSuffix}.xml");
         }
 
         // Resolve any VFS symlink so the chapter file is placed next to the real media file.
@@ -235,7 +233,7 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
             throw new InvalidOperationException($"Unable to determine directory for media path '{mediaPath}'");
         }
 
-        return Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(resolvedPath)}{ChapterFileSuffix}.xml");
+        return Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(resolvedPath)}{Constants.ChapterFileSuffix}.xml");
     }
 
     private static string TickToTime(long ticks) => TimeSpan.FromTicks(ticks).ToString(@"hh\:mm\:ss\.ff", System.Globalization.CultureInfo.InvariantCulture);

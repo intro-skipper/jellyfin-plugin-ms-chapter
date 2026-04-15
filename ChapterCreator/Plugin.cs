@@ -22,7 +22,6 @@ namespace ChapterCreator
     public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
         private const string IntroSkipperDataDir = "introskipper";
-        private const string ChaptersSuffix = "_chapters";
 
         private readonly ILibraryManager _libraryManager;
         private readonly IChapterRepository _chapterRepository;
@@ -172,14 +171,14 @@ namespace ChapterCreator
                     continue;
                 }
 
-                var oldPath = Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(realPath)}{ChaptersSuffix}.xml");
+                var oldPath = Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(realPath)}{Constants.ChapterFileSuffix}.xml");
 
                 if (!File.Exists(oldPath))
                 {
                     continue;
                 }
 
-                var newPath = Path.Combine(ChaptersFolderPath, $"{item.Id}{ChaptersSuffix}.xml");
+                var newPath = Path.Combine(ChaptersFolderPath, $"{item.Id}{Constants.ChapterFileSuffix}.xml");
 
                 try
                 {
@@ -208,10 +207,10 @@ namespace ChapterCreator
                 return;
             }
 
-            foreach (var file in Directory.GetFiles(ChaptersFolderPath, $"*{ChaptersSuffix}.xml"))
+            foreach (var file in Directory.GetFiles(ChaptersFolderPath, $"*{Constants.ChapterFileSuffix}.xml"))
             {
                 var stem = Path.GetFileNameWithoutExtension(file); // "{guid}_chapters"
-                var idStr = stem[..^ChaptersSuffix.Length];
+                var idStr = stem[..^Constants.ChapterFileSuffix.Length];
 
                 if (!Guid.TryParse(idStr, out var id))
                 {
@@ -245,7 +244,7 @@ namespace ChapterCreator
                     continue;
                 }
 
-                var newPath = Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(realPath)}{ChaptersSuffix}.xml");
+                var newPath = Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(realPath)}{Constants.ChapterFileSuffix}.xml");
 
                 try
                 {
