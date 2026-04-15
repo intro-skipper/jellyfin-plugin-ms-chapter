@@ -97,18 +97,18 @@
                         <div class="checkboxContainer checkboxContainer-withDescription">
                             <label class="emby-checkbox-label">
                                 <input id="OverwriteFiles" type="checkbox" is="emby-checkbox" checked />
-                                <span>Update chapter files</span>
+                                <span>Update existing chapter files</span>
                             </label>
 
-                            <div class="fieldDescription">If checked, the plugin will update already created files to keep them in sync with Media Segments.</div>
+                            <div class="fieldDescription">If checked, the plugin will update previously created files to keep them in sync with Media Segments.</div>
                         </div>
                         <div class="checkboxContainer checkboxContainer-withDescription">
                             <label class="emby-checkbox-label">
                                 <input id="UseChaptersFolder" type="checkbox" is="emby-checkbox" />
-                                <span>Write chapter files to introskipper chapters folder</span>
+                                <span>Write chapter files to Jellyfin data folder</span>
                             </label>
 
-                            <div class="fieldDescription">If checked, chapter XML files are written to <code>data/introskipper/chapters/</code> instead of next to each media file. Toggling this option will attempt to move existing files accordingly.</div>
+                            <div class="fieldDescription">If checked, chapter XML files are written to <code>data/introskipper/chapters/</code> instead of next to each media file. Toggling this option will attempt to move existing files accordingly on next run.</div>
                         </div>
                         <div>
                             <button is="emby-button" type="submit" class="raised button-submit block emby-button">
