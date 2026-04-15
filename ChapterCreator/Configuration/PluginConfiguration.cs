@@ -86,4 +86,9 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets the comma separated list of movies to skip the analyze.".
     /// </summary>
     public string SkippedMovies { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to write chapter XML files to the introskipper chapters folder instead of next to the media files.
+    /// </summary>
+    public bool UseChaptersFolder { get; set; } = false;
 }

@@ -90,7 +90,7 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
                 return;
             }
 
-            var chapterPath = GetChapterPath(filePath);
+            var chapterPath = GetChapterPath(filePath, id, _logger);
             _logger.LogDebug("Writing chapters to {Path}", chapterPath);
 
             CreateChapterXmlFile(chapterPath, chapterContent, overwrite, _logger);
@@ -201,7 +201,40 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
         };
     }
 
-    private static string GetChapterPath(string mediaPath) => Path.Combine(Path.GetDirectoryName(mediaPath)!, $"{Path.GetFileNameWithoutExtension(mediaPath)}_chapters.xml");
+    private static string GetChapterPath(string mediaPath, Guid id, ILogger? logger = null)
+    {
+        var config = Plugin.Instance?.Configuration;
+        if (config?.UseChaptersFolder == true)
+        {
+            return Path.Combine(Plugin.Instance!.ChaptersFolderPath, $"{id}{Constants.ChapterFileSuffix}.xml");
+        }
+
+        // Resolve any VFS symlink so the chapter file is placed next to the real media file.
+        // Fall back to the original path if resolution fails (e.g. broken symlink).
+        string resolvedPath;
+        try
+        {
+            resolvedPath = File.ResolveLinkTarget(mediaPath, returnFinalTarget: true)?.FullName ?? mediaPath;
+        }
+        catch (IOException ex)
+        {
+            logger?.LogDebug(ex, "Could not resolve symlink for {Path}, using original path", mediaPath);
+            resolvedPath = mediaPath;
+        }
+
+        var dir = Path.GetDirectoryName(resolvedPath);
+        if (string.IsNullOrEmpty(dir))
+        {
+            dir = Path.GetDirectoryName(mediaPath);
+        }
+
+        if (string.IsNullOrEmpty(dir))
+        {
+            throw new InvalidOperationException($"Unable to determine directory for media path '{mediaPath}'");
+        }
+
+        return Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(resolvedPath)}{Constants.ChapterFileSuffix}.xml");
+    }
 
     private static string TickToTime(long ticks) => TimeSpan.FromTicks(ticks).ToString(@"hh\:mm\:ss\.ff", System.Globalization.CultureInfo.InvariantCulture);
 

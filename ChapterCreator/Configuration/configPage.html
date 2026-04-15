@@ -97,10 +97,18 @@
                         <div class="checkboxContainer checkboxContainer-withDescription">
                             <label class="emby-checkbox-label">
                                 <input id="OverwriteFiles" type="checkbox" is="emby-checkbox" checked />
-                                <span>Update chapter files</span>
+                                <span>Update existing chapter files</span>
                             </label>
 
-                            <div class="fieldDescription">If checked, the plugin will update already created files to keep them in sync with Media Segments.</div>
+                            <div class="fieldDescription">If checked, the plugin will update previously created files to keep them in sync with Media Segments.</div>
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input id="UseChaptersFolder" type="checkbox" is="emby-checkbox" />
+                                <span>Write chapter files to Jellyfin data folder</span>
+                            </label>
+
+                            <div class="fieldDescription">If checked, chapter files are written to <code>data/introskipper/chapters/</code> instead of next to each media file. Existing files will be moved accordingly (if possible).</div>
                         </div>
                         <div>
                             <button is="emby-button" type="submit" class="raised button-submit block emby-button">
@@ -128,6 +136,7 @@
                         document.querySelector("#Epilogue").value = config.Epilogue;
                         document.querySelector("#SkipEmbeddedChapters").checked = config.SkipEmbeddedChapters;
                         document.querySelector("#OverwriteFiles").checked = config.OverwriteFiles;
+                        document.querySelector("#UseChaptersFolder").checked = config.UseChaptersFolder;
                         document.querySelector("#MaxParallelism").value = config.MaxParallelism;
                         document.querySelector("#MaxGap").value = config.MaxGap;
                         document.querySelector("#SelectedLibraries").value = config.SelectedLibraries;
@@ -150,6 +159,7 @@
                         config.Epilogue = document.querySelector("#Epilogue").value;
                         config.OverwriteFiles = document.querySelector("#OverwriteFiles").checked;
                         config.SkipEmbeddedChapters = document.querySelector("#SkipEmbeddedChapters").checked;
+                        config.UseChaptersFolder = document.querySelector("#UseChaptersFolder").checked;
                         config.MaxParallelism = document.querySelector("#MaxParallelism").value;
                         config.MaxGap = document.querySelector("#MaxGap").value;
                         config.SelectedLibraries = document.querySelector("#SelectedLibraries").value;
