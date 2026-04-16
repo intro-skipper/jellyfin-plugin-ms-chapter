@@ -22,11 +22,11 @@ namespace ChapterCreator
     public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
         private const string IntroSkipperDataDir = "introskipper";
+        private const string ChaptersDir = Constants.ChaptersDirectory;
 
         private readonly ILibraryManager _libraryManager;
         private readonly IChapterRepository _chapterRepository;
         private readonly ILogger<Plugin> _logger;
-        private bool _lastAppliedUseChaptersFolder;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Plugin"/> class.
@@ -49,7 +49,6 @@ namespace ChapterCreator
             _libraryManager = libraryManager;
             _chapterRepository = chapterRepository;
             _logger = logger;
-            _lastAppliedUseChaptersFolder = Configuration.UseChaptersFolder;
         }
 
         /// <inheritdoc />
@@ -64,9 +63,9 @@ namespace ChapterCreator
         public static Plugin? Instance { get; private set; }
 
         /// <summary>
-        /// Gets the path to the centralized chapters folder inside the introskipper data directory.
+        /// Gets the path to the legacy centralized chapters folder inside the introskipper data directory.
         /// </summary>
-        public string ChaptersFolderPath => Path.Join(ApplicationPaths.DataPath, IntroSkipperDataDir, "chapters");
+        public string LegacyChaptersFolderPath => Path.Join(ApplicationPaths.DataPath, IntroSkipperDataDir, ChaptersDir);
 
         /// <inheritdoc />
         public IEnumerable<PluginPageInfo> GetPages()
@@ -85,31 +84,6 @@ namespace ChapterCreator
         public override void UpdateConfiguration(BasePluginConfiguration configuration)
         {
             base.UpdateConfiguration(configuration);
-        }
-
-        /// <summary>
-        /// Checks whether the <see cref="PluginConfiguration.UseChaptersFolder"/> setting changed since the
-        /// last time a scheduled task ran and, if so, migrates existing chapter files to the new location.
-        /// Call this at the start of the scheduled task before writing any new files.
-        /// </summary>
-        internal void ApplyChaptersFolderMigrationIfNeeded()
-        {
-            var current = Configuration.UseChaptersFolder;
-            if (current == _lastAppliedUseChaptersFolder)
-            {
-                return;
-            }
-
-            if (current)
-            {
-                MigrateToChaptersFolder();
-            }
-            else
-            {
-                MigrateFromChaptersFolder();
-            }
-
-            _lastAppliedUseChaptersFolder = current;
         }
 
         internal BaseItem? GetItem(Guid id)
@@ -134,82 +108,24 @@ namespace ChapterCreator
         /// <returns>List of chapters.</returns>
         internal IReadOnlyList<ChapterInfo> GetChapters(Guid id) => _chapterRepository.GetChapters(id);
 
-        private void MigrateToChaptersFolder()
+        internal void MigrateLegacyChaptersFolderIfNeeded()
         {
-            _logger.LogInformation("UseChaptersFolder enabled: attempting to move existing chapter files to {Path}", ChaptersFolderPath);
-
-            var items = _libraryManager.GetItemList(new InternalItemsQuery
-            {
-                IncludeItemTypes = [BaseItemKind.Episode, BaseItemKind.Movie],
-                Recursive = true,
-                IsVirtualItem = false,
-            });
-
-            foreach (var item in items)
-            {
-                if (string.IsNullOrEmpty(item.Path))
-                {
-                    continue;
-                }
-
-                // Resolve any VFS symlink to locate the chapter file next to the real media.
-                string realPath;
-                try
-                {
-                    realPath = File.ResolveLinkTarget(item.Path, returnFinalTarget: true)?.FullName ?? item.Path;
-                }
-                catch (IOException ex)
-                {
-                    _logger.LogWarning(ex, "Could not resolve symlink for item {Id} at {Path}, skipping", item.Id, item.Path);
-                    continue;
-                }
-
-                var dir = Path.GetDirectoryName(realPath);
-                if (string.IsNullOrEmpty(dir))
-                {
-                    _logger.LogWarning("Could not determine directory for item {Id} at {Path}, skipping", item.Id, realPath);
-                    continue;
-                }
-
-                var oldPath = Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(realPath)}{Constants.ChapterFileSuffix}.xml");
-
-                if (!File.Exists(oldPath))
-                {
-                    continue;
-                }
-
-                var newPath = Path.Combine(ChaptersFolderPath, $"{item.Id}{Constants.ChapterFileSuffix}.xml");
-
-                try
-                {
-                    Directory.CreateDirectory(ChaptersFolderPath);
-                    if (File.Exists(newPath))
-                    {
-                        _logger.LogDebug("Overwriting existing chapter file at destination: {New}", newPath);
-                    }
-
-                    File.Move(oldPath, newPath, overwrite: true);
-                    _logger.LogDebug("Moved chapter file for item {Id}: {Old} -> {New}", item.Id, oldPath, newPath);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Could not move chapter file for item {Id} from {Old}", item.Id, oldPath);
-                }
-            }
-        }
-
-        private void MigrateFromChaptersFolder()
-        {
-            _logger.LogInformation("UseChaptersFolder disabled: attempting to move chapter files back next to media from {Path}", ChaptersFolderPath);
-
-            if (!Directory.Exists(ChaptersFolderPath))
+            if (!Directory.Exists(LegacyChaptersFolderPath))
             {
                 return;
             }
 
-            foreach (var file in Directory.GetFiles(ChaptersFolderPath, $"*{Constants.ChapterFileSuffix}.xml"))
+            _logger.LogInformation("Migrating legacy chapter files from {Path}", LegacyChaptersFolderPath);
+
+            foreach (var file in Directory.GetFiles(LegacyChaptersFolderPath, $"*{Constants.ChapterFileSuffix}.xml"))
             {
                 var stem = Path.GetFileNameWithoutExtension(file); // "{guid}_chapters"
+                if (stem.Length <= Constants.ChapterFileSuffix.Length || !stem.EndsWith(Constants.ChapterFileSuffix, StringComparison.Ordinal))
+                {
+                    _logger.LogDebug("Skipping unrecognised chapter file in chapters folder: {File}", file);
+                    continue;
+                }
+
                 var idStr = stem[..^Constants.ChapterFileSuffix.Length];
 
                 if (!Guid.TryParse(idStr, out var id))
@@ -221,7 +137,7 @@ namespace ChapterCreator
                 var item = GetItem(id);
                 if (item is null || string.IsNullOrEmpty(item.Path))
                 {
-                    _logger.LogDebug("No library item found for chapter file {File}, leaving in place", file);
+                    _logger.LogDebug("No library item found for chapter file {File}, leaving in legacy folder", file);
                     continue;
                 }
 
@@ -231,7 +147,7 @@ namespace ChapterCreator
                 {
                     realPath = File.ResolveLinkTarget(item.Path, returnFinalTarget: true)?.FullName ?? item.Path;
                 }
-                catch (IOException ex)
+                catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Could not resolve symlink for item {Id} at {Path}, skipping", id, item.Path);
                     continue;
@@ -244,10 +160,11 @@ namespace ChapterCreator
                     continue;
                 }
 
-                var newPath = Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(realPath)}{Constants.ChapterFileSuffix}.xml");
+                var newPath = Path.Combine(dir, ChaptersDir, $"{Path.GetFileNameWithoutExtension(realPath)}{Constants.ChapterFileSuffix}.xml");
 
                 try
                 {
+                    Directory.CreateDirectory(Path.GetDirectoryName(newPath)!);
                     if (File.Exists(newPath))
                     {
                         _logger.LogDebug("Overwriting existing chapter file at destination: {New}", newPath);
@@ -260,6 +177,38 @@ namespace ChapterCreator
                 {
                     _logger.LogWarning(ex, "Could not move chapter file {File} back next to media", file);
                 }
+            }
+
+            TryRemoveLegacyFolders();
+        }
+
+        private void TryRemoveLegacyFolders()
+        {
+            try
+            {
+                if (Directory.Exists(LegacyChaptersFolderPath) && Directory.GetFileSystemEntries(LegacyChaptersFolderPath).Length == 0)
+                {
+                    Directory.Delete(LegacyChaptersFolderPath);
+                    _logger.LogInformation("Removed empty legacy chapters folder {Path}", LegacyChaptersFolderPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Could not remove legacy chapters folder {Path}", LegacyChaptersFolderPath);
+            }
+
+            var introSkipperPath = Path.Join(ApplicationPaths.DataPath, IntroSkipperDataDir);
+            try
+            {
+                if (Directory.Exists(introSkipperPath) && Directory.GetFileSystemEntries(introSkipperPath).Length == 0)
+                {
+                    Directory.Delete(introSkipperPath);
+                    _logger.LogInformation("Removed empty legacy data folder {Path}", introSkipperPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Could not remove legacy data folder {Path}", introSkipperPath);
             }
         }
     }
