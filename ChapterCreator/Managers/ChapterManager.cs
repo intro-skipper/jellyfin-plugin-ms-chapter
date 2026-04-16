@@ -227,7 +227,7 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
             throw new InvalidOperationException($"Unable to determine directory for media path '{mediaPath}'");
         }
 
-        var chaptersDir = Path.Combine(dir, "chapters");
+        var chaptersDir = Path.Combine(dir, Constants.ChaptersDirectory);
         return Path.Combine(chaptersDir, $"{Path.GetFileNameWithoutExtension(resolvedPath)}{Constants.ChapterFileSuffix}.xml");
     }
 
