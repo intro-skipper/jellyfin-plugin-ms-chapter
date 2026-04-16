@@ -90,7 +90,7 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
                 return;
             }
 
-            var chapterPath = GetChapterPath(filePath, id, _logger);
+            var chapterPath = GetChapterPath(filePath, _logger);
             _logger.LogDebug("Writing chapters to {Path}", chapterPath);
 
             CreateChapterXmlFile(chapterPath, chapterContent, overwrite, _logger);
@@ -201,14 +201,8 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
         };
     }
 
-    private static string GetChapterPath(string mediaPath, Guid id, ILogger? logger = null)
+    private static string GetChapterPath(string mediaPath, ILogger? logger = null)
     {
-        var config = Plugin.Instance?.Configuration;
-        if (config?.UseChaptersFolder == true)
-        {
-            return Path.Combine(Plugin.Instance!.ChaptersFolderPath, $"{id}{Constants.ChapterFileSuffix}.xml");
-        }
-
         // Resolve any VFS symlink so the chapter file is placed next to the real media file.
         // Fall back to the original path if resolution fails (e.g. broken symlink).
         string resolvedPath;
@@ -233,7 +227,8 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
             throw new InvalidOperationException($"Unable to determine directory for media path '{mediaPath}'");
         }
 
-        return Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(resolvedPath)}{Constants.ChapterFileSuffix}.xml");
+        var chaptersDir = Path.Combine(dir, "chapters");
+        return Path.Combine(chaptersDir, $"{Path.GetFileNameWithoutExtension(resolvedPath)}{Constants.ChapterFileSuffix}.xml");
     }
 
     private static string TickToTime(long ticks) => TimeSpan.FromTicks(ticks).ToString(@"hh\:mm\:ss\.ff", System.Globalization.CultureInfo.InvariantCulture);

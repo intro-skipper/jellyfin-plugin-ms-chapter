@@ -70,8 +70,8 @@ public class CreateChapterTask(
 
         var baseChapterTask = new BaseChapterTask(_chapterManager);
 
-        // Migrate chapter files if the UseChaptersFolder setting changed since the last run.
-        Plugin.Instance!.ApplyChaptersFolderMigrationIfNeeded();
+        // Migrate any chapter files from the legacy Jellyfin data folder location.
+        Plugin.Instance!.MigrateLegacyChaptersFolderIfNeeded();
 
         var segmentsList = new List<MediaSegmentDto>();
         // get ItemIds
