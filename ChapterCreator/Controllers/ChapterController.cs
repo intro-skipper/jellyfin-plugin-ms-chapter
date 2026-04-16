@@ -148,7 +148,7 @@ public class ChapterController(
             var segmentsList = await _mediaSegmentManager.GetSegmentsAsync(
                 item, null, new LibraryOptions(), true).ConfigureAwait(false);
 
-            if (segmentsList.Count == 0)
+            if (!segmentsList.Any())
             {
                 continue;
             }
