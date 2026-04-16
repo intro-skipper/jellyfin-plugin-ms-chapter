@@ -22,7 +22,7 @@ namespace ChapterCreator
     public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
         private const string IntroSkipperDataDir = "introskipper";
-        private const string ChaptersDir = "chapters";
+        private const string ChaptersDir = Constants.ChaptersDirectory;
 
         private readonly ILibraryManager _libraryManager;
         private readonly IChapterRepository _chapterRepository;
