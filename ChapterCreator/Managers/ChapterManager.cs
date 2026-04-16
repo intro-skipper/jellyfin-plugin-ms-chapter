@@ -210,7 +210,7 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
         {
             resolvedPath = File.ResolveLinkTarget(mediaPath, returnFinalTarget: true)?.FullName ?? mediaPath;
         }
-        catch (IOException ex)
+        catch (Exception ex)
         {
             logger?.LogDebug(ex, "Could not resolve symlink for {Path}, using original path", mediaPath);
             resolvedPath = mediaPath;

@@ -120,6 +120,12 @@ namespace ChapterCreator
             foreach (var file in Directory.GetFiles(LegacyChaptersFolderPath, $"*{Constants.ChapterFileSuffix}.xml"))
             {
                 var stem = Path.GetFileNameWithoutExtension(file); // "{guid}_chapters"
+                if (stem.Length <= Constants.ChapterFileSuffix.Length || !stem.EndsWith(Constants.ChapterFileSuffix, StringComparison.Ordinal))
+                {
+                    _logger.LogDebug("Skipping unrecognised chapter file in chapters folder: {File}", file);
+                    continue;
+                }
+
                 var idStr = stem[..^Constants.ChapterFileSuffix.Length];
 
                 if (!Guid.TryParse(idStr, out var id))
@@ -141,7 +147,7 @@ namespace ChapterCreator
                 {
                     realPath = File.ResolveLinkTarget(item.Path, returnFinalTarget: true)?.FullName ?? item.Path;
                 }
-                catch (IOException ex)
+                catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Could not resolve symlink for item {Id} at {Path}, skipping", id, item.Path);
                     continue;
