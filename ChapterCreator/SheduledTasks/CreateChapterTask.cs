@@ -21,19 +21,17 @@ namespace ChapterCreator.SheduledTasks;
 /// <param name="loggerFactory">Logger factory.</param>
 /// <param name="libraryManager">Library manager.</param>
 /// <param name="mediaSegmentManager">MediaSegment manager.</param>
-/// <param name="chapterManager">ChapterManager.</param>
+/// <param name="chapterOutputService">Chapter output service.</param>
 public class CreateChapterTask(
     ILoggerFactory loggerFactory,
     ILibraryManager libraryManager,
     IMediaSegmentManager mediaSegmentManager,
-    IChapterManager chapterManager) : IScheduledTask
+    IChapterOutputService chapterOutputService) : IScheduledTask
 {
     private readonly ILoggerFactory _loggerFactory = loggerFactory;
     private readonly ILibraryManager _libraryManager = libraryManager;
-
     private readonly IMediaSegmentManager _mediaSegmentManager = mediaSegmentManager;
-
-    private readonly IChapterManager _chapterManager = chapterManager;
+    private readonly IChapterOutputService _chapterOutputService = chapterOutputService;
 
     /// <summary>
     /// Gets the task name.
@@ -68,7 +66,7 @@ public class CreateChapterTask(
             throw new InvalidOperationException("Library manager was null");
         }
 
-        var baseChapterTask = new BaseChapterTask(_chapterManager);
+        var baseChapterTask = new BaseChapterTask(_chapterOutputService);
 
         // Migrate any chapter files from the legacy Jellyfin data folder location.
         Plugin.Instance!.MigrateLegacyChaptersFolderIfNeeded();
@@ -94,10 +92,8 @@ public class CreateChapterTask(
         // write chapter files
         if (segmentsList.Count > 0)
         {
-            baseChapterTask.CreateChapters(progress, segmentsList, false, cancellationToken);
+            await baseChapterTask.CreateChaptersAsync(progress, segmentsList, false, cancellationToken).ConfigureAwait(false);
         }
-
-        return;
     }
 
     /// <summary>

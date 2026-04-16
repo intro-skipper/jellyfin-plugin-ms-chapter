@@ -12,26 +12,30 @@ using Microsoft.Extensions.Logging;
 namespace ChapterCreator.Managers;
 
 /// <summary>
-/// ChapterManager class.
+/// ChapterFileManager class.
 /// </summary>
 /// <remarks>
-/// Initializes a new instance of the <see cref="ChapterManager"/> class.
+/// Initializes a new instance of the <see cref="ChapterFileManager"/> class.
 /// </remarks>
 /// <param name="logger">The logger instance.</param>
-public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
+public partial class ChapterFileManager(ILogger<ChapterFileManager> logger) : IChapterFileManager
 {
-    private readonly ILogger<ChapterManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly PluginConfiguration _configuration = new();
+    private readonly ILogger<ChapterFileManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly PluginConfiguration? _configuration;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ChapterManager"/> class.
+    /// Initializes a new instance of the <see cref="ChapterFileManager"/> class.
+    /// Used for unit testing to inject a specific configuration without requiring Plugin.Instance.
     /// </summary>
     /// <param name="logger">The logger.</param>
     /// <param name="configuration">The plugin configuration. If null, will try to use Plugin.Instance.Configuration or create a new one.</param>
-    public ChapterManager(ILogger<ChapterManager> logger, PluginConfiguration? configuration = null) : this(logger)
+    public ChapterFileManager(ILogger<ChapterFileManager> logger, PluginConfiguration? configuration) : this(logger)
     {
-        _configuration = configuration ?? Plugin.Instance?.Configuration ?? new PluginConfiguration();
+        _configuration = configuration;
     }
+
+    private PluginConfiguration EffectiveConfiguration =>
+        _configuration ?? Plugin.Instance?.Configuration ?? new PluginConfiguration();
 
     /// <summary>
     /// Logs the configuration that will be used during Chapter file creation.
@@ -40,8 +44,8 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
     {
         var config = Plugin.Instance!.Configuration;
 
-        _logger.LogDebug("Overwrite Chapter files: {Regenerate}", config.OverwriteFiles);
-        _logger.LogDebug("Max Parallelism: {Action}", config.MaxParallelism);
+        LogOverwriteSetting(_logger, config.OverwriteFiles);
+        LogMaxParallelism(_logger, config.MaxParallelism);
     }
 
     /// <summary>
@@ -61,11 +65,11 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
         var embeddedChapters = Plugin.Instance.GetChapters(id);
         if (!forceOverwrite && embeddedChapters.Count > 0 && config.SkipEmbeddedChapters)
         {
-            _logger.LogDebug("Skipping item {Id} as it already has embedded chapters", id);
+            LogSkippingEmbeddedChapters(_logger, id);
             return;
         }
 
-        _logger.LogDebug("Processing chapters for item {Id}", id);
+        LogProcessingChapters(_logger, id);
 
         try
         {
@@ -73,42 +77,42 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
 
             if (chapterContent.Count == 0)
             {
-                _logger.LogDebug("Skip id ({Id}): no chapter data generated", id);
+                LogNoChapterData(_logger, id);
                 return;
             }
 
             var filePath = Plugin.Instance!.GetItemPath(id);
             if (string.IsNullOrEmpty(filePath))
             {
-                _logger.LogWarning("Skip id ({Id}): unable to get item path", id);
+                LogUnableToGetPath(_logger, id);
                 return;
             }
 
             if (!File.Exists(filePath))
             {
-                _logger.LogWarning("Skip id ({Id}): media file not found at {Path}", id, filePath);
+                LogMediaFileNotFound(_logger, id, filePath);
                 return;
             }
 
             var chapterPath = GetChapterPath(filePath, _logger);
-            _logger.LogDebug("Writing chapters to {Path}", chapterPath);
+            LogWritingChapters(_logger, chapterPath);
 
             CreateChapterXmlFile(chapterPath, chapterContent, overwrite, _logger);
-            _logger.LogDebug("Successfully created chapter file for {Id} at {Path}", id, chapterPath);
+            LogChapterFileCreated(_logger, id, chapterPath);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to create chapter file for item {Id}", id);
+            LogChapterFileError(_logger, id, ex);
             throw;
         }
     }
 
     /// <summary>
-    /// Convert segments to a Kodi compatible Chapter entry.
+    /// Convert segments to chapter entries.
     /// </summary>
     /// <param name="id">The ItemId.</param>
     /// <param name="segments">The Segments.</param>
-    /// <returns>String content of chapter file.</returns>
+    /// <returns>List of chapter entries.</returns>
     public IReadOnlyList<Chapter> ToChapter(Guid id, IReadOnlyCollection<MediaSegmentDto> segments)
     {
         if (segments is null || segments.Count == 0)
@@ -116,7 +120,7 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
             return [];
         }
 
-        var config = _configuration;
+        var config = EffectiveConfiguration;
 
         // Get episode runtime from item
         var item = Plugin.Instance?.GetItem(id);
@@ -157,7 +161,7 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
                 hasSeenOutro = true;
             }
 
-            var name = GetChapterName(segment.Type);
+            var name = GetChapterName(segment.Type, config);
 
             // Only add chapter if it has a name
             if (!string.IsNullOrEmpty(name))
@@ -188,20 +192,20 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
         return chapters;
     }
 
-    private string GetChapterName(MediaSegmentType type)
+    private static string GetChapterName(MediaSegmentType type, PluginConfiguration config)
     {
         return type switch
         {
-            MediaSegmentType.Intro => _configuration.Intro,
-            MediaSegmentType.Outro => _configuration.Outro,
-            MediaSegmentType.Recap => _configuration.Recap,
-            MediaSegmentType.Preview => _configuration.Preview,
-            MediaSegmentType.Commercial => _configuration.Commercial,
-            _ => _configuration.Unknown,
+            MediaSegmentType.Intro => config.Intro,
+            MediaSegmentType.Outro => config.Outro,
+            MediaSegmentType.Recap => config.Recap,
+            MediaSegmentType.Preview => config.Preview,
+            MediaSegmentType.Commercial => config.Commercial,
+            _ => config.Unknown,
         };
     }
 
-    private static string GetChapterPath(string mediaPath, ILogger? logger = null)
+    internal static string GetChapterPath(string mediaPath, ILogger? logger = null)
     {
         // Resolve any VFS symlink so the chapter file is placed next to the real media file.
         // Fall back to the original path if resolution fails (e.g. broken symlink).
@@ -212,7 +216,11 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
         }
         catch (Exception ex)
         {
-            logger?.LogDebug(ex, "Could not resolve symlink for {Path}, using original path", mediaPath);
+            if (logger is not null)
+            {
+                LogSymlinkResolutionFailed(logger, mediaPath, ex);
+            }
+
             resolvedPath = mediaPath;
         }
 
@@ -239,7 +247,11 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
 
         if (chapters is null || chapters.Count == 0)
         {
-            logger?.LogDebug("No chapters provided for file {Filename}", filename);
+            if (logger is not null)
+            {
+                LogNoChaptersProvided(logger, filename);
+            }
+
             return;
         }
 
@@ -247,22 +259,36 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
         {
             if (!overwrite)
             {
-                logger?.LogDebug("Skipping existing chapter file {Filename} (overwrite disabled)", filename);
+                if (logger is not null)
+                {
+                    LogSkippingExistingFile(logger, filename);
+                }
+
                 return;
             }
 
-            logger?.LogDebug("Overwriting existing chapter file {Filename}", filename);
+            if (logger is not null)
+            {
+                LogOverwritingFile(logger, filename);
+            }
         }
 
         var directoryPath = Path.GetDirectoryName(filename)!;
         Directory.CreateDirectory(directoryPath);
-        logger?.LogDebug("Ensuring directory exists: {Directory}", directoryPath);
+
+        if (logger is not null)
+        {
+            LogEnsureDirectory(logger, directoryPath);
+        }
 
         // Generate random UIDs for the Edition and Chapters
         long editionUID = GenerateUID();
         long[] chapterUIDs = [.. Enumerable.Range(0, chapters.Count).Select(_ => GenerateUID())];
 
-        logger?.LogDebug("Writing {Count} chapters to {Filename}", chapters.Count, filename);
+        if (logger is not null)
+        {
+            LogWritingChapterCount(logger, chapters.Count, filename);
+        }
 
         // Create an XML writer with appropriate settings
         XmlWriterSettings settings = new XmlWriterSettings
@@ -328,4 +354,54 @@ public class ChapterManager(ILogger<ChapterManager> logger) : IChapterManager
         rng.GetBytes(buffer);
         return BitConverter.ToInt64(buffer, 0) & 0x7FFFFFFFFFFFFFFF; // Ensure positive number
     }
+
+    // Source-generated logging methods
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Overwrite Chapter files: {OverwriteFiles}")]
+    private static partial void LogOverwriteSetting(ILogger logger, bool overwriteFiles);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Max Parallelism: {MaxParallelism}")]
+    private static partial void LogMaxParallelism(ILogger logger, int maxParallelism);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Skipping item {Id} as it already has embedded chapters")]
+    private static partial void LogSkippingEmbeddedChapters(ILogger logger, Guid id);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Processing chapters for item {Id}")]
+    private static partial void LogProcessingChapters(ILogger logger, Guid id);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Skip id ({Id}): no chapter data generated")]
+    private static partial void LogNoChapterData(ILogger logger, Guid id);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Skip id ({Id}): unable to get item path")]
+    private static partial void LogUnableToGetPath(ILogger logger, Guid id);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Skip id ({Id}): media file not found at {Path}")]
+    private static partial void LogMediaFileNotFound(ILogger logger, Guid id, string path);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Writing chapters to {Path}")]
+    private static partial void LogWritingChapters(ILogger logger, string path);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Successfully created chapter file for {Id} at {Path}")]
+    private static partial void LogChapterFileCreated(ILogger logger, Guid id, string path);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to create chapter file for item {Id}")]
+    private static partial void LogChapterFileError(ILogger logger, Guid id, Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Could not resolve symlink for {Path}, using original path")]
+    private static partial void LogSymlinkResolutionFailed(ILogger logger, string path, Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "No chapters provided for file {Filename}")]
+    private static partial void LogNoChaptersProvided(ILogger logger, string filename);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Skipping existing chapter file {Filename} (overwrite disabled)")]
+    private static partial void LogSkippingExistingFile(ILogger logger, string filename);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Overwriting existing chapter file {Filename}")]
+    private static partial void LogOverwritingFile(ILogger logger, string filename);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Ensuring directory exists: {Directory}")]
+    private static partial void LogEnsureDirectory(ILogger logger, string directory);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Writing {Count} chapters to {Filename}")]
+    private static partial void LogWritingChapterCount(ILogger logger, int count, string filename);
 }

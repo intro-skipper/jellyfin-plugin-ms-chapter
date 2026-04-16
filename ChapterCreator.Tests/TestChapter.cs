@@ -12,11 +12,11 @@ namespace ChapterCreator.Tests;
 
 public class TestChapter
 {
-    private readonly ChapterManager _chapterManager;
+    private readonly ChapterFileManager _chapterFileManager;
 
     public TestChapter()
     {
-        // Create a real ChapterManager with a null logger and a test configuration
+        // Create a real ChapterFileManager with a null logger and a test configuration
         var config = new PluginConfiguration
         {
             Intro = "Intro",
@@ -29,8 +29,8 @@ public class TestChapter
             MaxGap = 0
         };
 
-        _chapterManager = new ChapterManager(
-            NullLogger<ChapterManager>.Instance,
+        _chapterFileManager = new ChapterFileManager(
+            NullLogger<ChapterFileManager>.Instance,
             config);
     }
 
@@ -57,7 +57,7 @@ public class TestChapter
             }
         ]);
 
-        var chapters = _chapterManager.ToChapter(Guid.NewGuid(), segments);
+        var chapters = _chapterFileManager.ToChapter(Guid.NewGuid(), segments);
 
         // Find the chapter with the matching type
         var chapter = chapters.FirstOrDefault(c => c.Title == type.ToString());

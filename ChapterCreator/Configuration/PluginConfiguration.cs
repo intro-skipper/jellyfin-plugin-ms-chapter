@@ -86,4 +86,17 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets the comma separated list of movies to skip the analyze.".
     /// </summary>
     public string SkippedMovies { get; set; } = string.Empty;
+
+    /// <summary> Gets or sets a value indicating whether to auto refresh items after chapter creation. </summary>
+    public bool AutoRefresh { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the chapter output mode.
+    /// </summary>
+    public ChapterOutputMode OutputMode { get; set; } = ChapterOutputMode.Both;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to import chapters from existing XML files into Jellyfin's database.
+    /// </summary>
+    public bool ImportXmlChapters { get; set; } = true;
 }

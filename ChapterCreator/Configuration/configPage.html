@@ -94,6 +94,31 @@
 
                             <div class="fieldDescription">If checked, the plugin will skip items with embedded chapters.</div>
                         </div>
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="OutputMode"> Chapter Output Mode </label>
+                            <select id="OutputMode" is="emby-select">
+                                <option value="XmlOnly">XML Files Only</option>
+                                <option value="InjectOnly">Jellyfin Database Only</option>
+                                <option value="Both">Both (XML + Database)</option>
+                            </select>
+                            <div class="fieldDescription">Choose how chapters are saved. XML files are written next to media files. Jellyfin Database makes chapters appear in the player timeline.</div>
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input id="ImportXmlChapters" type="checkbox" is="emby-checkbox" checked />
+                                <span>Import XML chapters into Jellyfin database</span>
+                            </label>
+
+                            <div class="fieldDescription">If checked, existing XML chapter files will be imported into Jellyfin's database when no media segments are available.</div>
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input id="AutoRefresh" type="checkbox" is="emby-checkbox" checked />
+                                <span>Auto-refresh chapters during library scan</span>
+                            </label>
+
+                            <div class="fieldDescription">If checked, chapters will be automatically created or updated when items are scanned during a library refresh.</div>
+                        </div>
                         <div class="checkboxContainer checkboxContainer-withDescription">
                             <label class="emby-checkbox-label">
                                 <input id="OverwriteFiles" type="checkbox" is="emby-checkbox" checked />
@@ -133,6 +158,9 @@
                         document.querySelector("#SelectedLibraries").value = config.SelectedLibraries;
                         document.querySelector("#SkippedTvShows").value = config.SkippedTvShows;
                         document.querySelector("#SkippedMovies").value = config.SkippedMovies;
+                        document.querySelector("#OutputMode").value = config.OutputMode;
+                        document.querySelector("#ImportXmlChapters").checked = config.ImportXmlChapters;
+                        document.querySelector("#AutoRefresh").checked = config.AutoRefresh;
                         Dashboard.hideLoadingMsg();
                     });
                 });
@@ -155,6 +183,9 @@
                         config.SelectedLibraries = document.querySelector("#SelectedLibraries").value;
                         config.SkippedTvShows = document.querySelector("#SkippedTvShows").value;
                         config.SkippedMovies = document.querySelector("#SkippedMovies").value;
+                        config.OutputMode = document.querySelector("#OutputMode").value;
+                        config.ImportXmlChapters = document.querySelector("#ImportXmlChapters").checked;
+                        config.AutoRefresh = document.querySelector("#AutoRefresh").checked;
                         ApiClient.updatePluginConfiguration(TemplateConfig.pluginUniqueId, config).then(function (result) {
                             Dashboard.processPluginConfigurationUpdateResult(result);
                         });
