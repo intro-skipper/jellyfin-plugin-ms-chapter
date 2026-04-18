@@ -36,7 +36,7 @@ public class CreateChapterTask(
     /// <summary>
     /// Gets the task name.
     /// </summary>
-    public string Name => "Create Chapter XMLs";
+    public string Name => "Create Chapter Markers";
 
     /// <summary>
     /// Gets the task category.
@@ -46,7 +46,7 @@ public class CreateChapterTask(
     /// <summary>
     /// Gets the task description.
     /// </summary>
-    public string Description => "Create chapters from Media Segments.";
+    public string Description => "Create chapter markers from Media Segments.";
 
     /// <summary>
     /// Gets the task key.
