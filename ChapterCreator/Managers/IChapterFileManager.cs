@@ -6,9 +6,9 @@ using MediaBrowser.Model.MediaSegments;
 namespace ChapterCreator.Managers;
 
 /// <summary>
-/// Interface for chapter management operations.
+/// Interface for chapter file management operations.
 /// </summary>
-public interface IChapterManager
+public interface IChapterFileManager
 {
     /// <summary>
     /// Logs the configuration that will be used during Chapter file creation.
@@ -23,10 +23,10 @@ public interface IChapterManager
     void UpdateChapterFile(KeyValuePair<Guid, List<MediaSegmentDto>> psegment, bool forceOverwrite);
 
     /// <summary>
-    /// Convert segments to a Kodi compatible Chapter entry.
+    /// Convert segments to chapter entries.
     /// </summary>
     /// <param name="id">The ItemId.</param>
     /// <param name="segments">The Segments.</param>
-    /// <returns>String content of chapter file.</returns>
+    /// <returns>List of chapter entries.</returns>
     IReadOnlyList<Chapter> ToChapter(Guid id, IReadOnlyCollection<MediaSegmentDto> segments);
 }

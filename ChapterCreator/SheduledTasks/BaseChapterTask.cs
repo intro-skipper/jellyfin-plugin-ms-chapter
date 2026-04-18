@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ChapterCreator.Managers;
@@ -14,49 +13,45 @@ namespace ChapterCreator.SheduledTasks;
 /// <remarks>
 /// Initializes a new instance of the <see cref="BaseChapterTask"/> class.
 /// </remarks>
-/// <param name="chapterManager">ChapterManager.</param>
-public class BaseChapterTask(IChapterManager chapterManager)
+/// <param name="chapterOutputService">Chapter output service.</param>
+public class BaseChapterTask(IChapterOutputService chapterOutputService)
 {
-    private readonly IChapterManager _chapterManager = chapterManager;
+    private readonly IChapterOutputService _chapterOutputService = chapterOutputService;
 
     /// <summary>
-    /// Create chapters for all Segments on the server.
+    /// Create chapters for all segments on the server.
     /// </summary>
     /// <param name="progress">Progress.</param>
     /// <param name="segmentsQueue">Media segments.</param>
     /// <param name="forceOverwrite">Force the file overwrite.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    public void CreateChapters(
+    /// <returns>A task representing the asynchronous operation.</returns>
+    public async Task CreateChaptersAsync(
         IProgress<double> progress,
         IReadOnlyCollection<MediaSegmentDto> segmentsQueue,
         bool forceOverwrite,
         CancellationToken cancellationToken)
     {
+        _chapterOutputService.LogConfiguration();
+
         // Group segments by ItemId and sort them by StartTicks in one pass
-        var sortedSegments = segmentsQueue
-            .GroupBy(s => s.ItemId)
-            .ToDictionary(
-                g => g.Key,
-                g => g.OrderBy(s => s.StartTicks).ToList());
+        var sortedSegments = segmentsQueue.GroupAndSortByItem();
 
         var totalQueued = sortedSegments.Count;
-
-        _chapterManager.LogConfiguration();
-
         var totalProcessed = 0;
-        var options = new ParallelOptions()
+        var maxParallelism = Plugin.Instance!.Configuration.MaxParallelism;
+
+        var options = new ParallelOptions
         {
-            MaxDegreeOfParallelism = Plugin.Instance!.Configuration.MaxParallelism
+            MaxDegreeOfParallelism = maxParallelism,
+            CancellationToken = cancellationToken
         };
 
-        Parallel.ForEach(sortedSegments, options, (segment) =>
+        await Parallel.ForEachAsync(sortedSegments, options, async (segment, ct) =>
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            _chapterManager.UpdateChapterFile(segment, forceOverwrite);
-            Interlocked.Add(ref totalProcessed, 1);
-
-            progress.Report(totalProcessed * 100 / totalQueued);
-    });
+            await _chapterOutputService.ProcessChaptersAsync(segment, forceOverwrite, ct).ConfigureAwait(false);
+            var processed = Interlocked.Increment(ref totalProcessed);
+            progress.Report(processed * 100.0 / totalQueued);
+        }).ConfigureAwait(false);
     }
 }

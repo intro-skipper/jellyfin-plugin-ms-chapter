@@ -22,7 +22,7 @@ namespace ChapterCreator.Managers;
 /// </remarks>
 /// <param name="logger">Logger.</param>
 /// <param name="libraryManager">Library manager.</param>
-public class QueueManager(ILogger<QueueManager> logger, ILibraryManager libraryManager)
+public partial class QueueManager(ILogger<QueueManager> logger, ILibraryManager libraryManager)
 {
     private readonly ILibraryManager _libraryManager = libraryManager;
     private readonly ILogger<QueueManager> _logger = logger;
@@ -45,14 +45,11 @@ public class QueueManager(ILogger<QueueManager> logger, ILibraryManager libraryM
             // If libraries have been selected for analysis, ensure this library was selected.
             if (_selectedLibraries.Count > 0 && !_selectedLibraries.Contains(folder.Name))
             {
-                _logger.LogDebug("Not analyzing library \"{Name}\": not selected by user", folder.Name);
+                LogLibraryNotSelected(_logger, folder.Name);
                 continue;
             }
 
-            _logger.LogInformation(
-                "Running enqueue of items in library {Name} ({ItemId})",
-                folder.Name,
-                folder.ItemId);
+            LogEnqueueLibrary(_logger, folder.Name, folder.ItemId);
 
             try
             {
@@ -60,7 +57,7 @@ public class QueueManager(ILogger<QueueManager> logger, ILibraryManager libraryM
             }
             catch (Exception ex)
             {
-                _logger.LogError("Failed to enqueue items from library {Name}: {Exception}", folder.Name, ex);
+                LogEnqueueFailure(_logger, folder.Name, ex);
             }
         }
 
@@ -104,7 +101,7 @@ public class QueueManager(ILogger<QueueManager> logger, ILibraryManager libraryM
                     }
                     catch (FormatException)
                     {
-                        _logger.LogError("Skipping TV Shows: Failed to parse season number '{Nr}' for tv show: {Name}. Fix your config!", nr, name);
+                        LogSeasonParseFailure(_logger, nr, name);
                     }
                 }
 
@@ -119,17 +116,17 @@ public class QueueManager(ILogger<QueueManager> logger, ILibraryManager libraryM
         // If any libraries have been selected for analysis, log their names.
         if (_selectedLibraries.Count > 0)
         {
-            _logger.LogInformation("Limiting analysis to the following libraries: {Selected}", _selectedLibraries);
+            LogSelectedLibraries(_logger, string.Join(", ", _selectedLibraries));
         }
         else
         {
-            _logger.LogDebug("Not limiting analysis by library name");
+            LogNoLibraryFilter(_logger);
         }
     }
 
     private void QueueLibraryContents(string rawId)
     {
-        _logger.LogDebug("Constructing anonymous internal query");
+        LogConstructingQuery(_logger);
 
         var includes = new BaseItemKind[] { BaseItemKind.Episode, BaseItemKind.Movie };
 
@@ -148,18 +145,18 @@ public class QueueManager(ILogger<QueueManager> logger, ILibraryManager libraryM
             IsVirtualItem = false
         };
 
-        _logger.LogDebug("Getting items");
+        LogGettingItems(_logger);
 
         var items = _libraryManager.GetItemList(query, false);
 
         if (items is null)
         {
-            _logger.LogError("Library query result is null");
+            LogLibraryQueryNull(_logger);
             return;
         }
 
         // Queue all media on the server.
-        _logger.LogDebug("Iterating through library items");
+        LogIteratingItems(_logger);
 
         foreach (var item in items)
         {
@@ -167,7 +164,7 @@ public class QueueManager(ILogger<QueueManager> logger, ILibraryManager libraryM
             {
                 if (SkipEpisode(episode))
                 {
-                    _logger.LogInformation("Skipping episode: '{EpisodeName}' of series: '{SeriesName} S{Season}'", episode.Name, episode.SeriesName, episode.AiredSeasonNumber);
+                    LogSkippingEpisode(_logger, episode.Name, episode.SeriesName, episode.AiredSeasonNumber);
                     continue;
                 }
 
@@ -177,25 +174,25 @@ public class QueueManager(ILogger<QueueManager> logger, ILibraryManager libraryM
             {
                 if (_skippedMovies.Contains(movie.Name))
                 {
-                    _logger.LogInformation("Skipping Movie: '{Name}'", movie.Name);
+                    LogSkippingMovie(_logger, movie.Name);
                     continue;
                 }
 
                 // Movie can have multiple MediaSources like 1080p and a 4k file, they have different ids
                 foreach (MediaSourceInfo source in movie.GetMediaSources(false))
                 {
-                    _logger.LogInformation("Adding movie: '{Name} ({Format})'", movie.Name, source.Name);
+                    LogAddingMovie(_logger, movie.Name, source.Name);
                     QueueMovie(movie, source);
                 }
             }
             else
             {
-                _logger.LogDebug("Item {Name} is not an episode or movie", item.Name);
+                LogItemNotEpisodeOrMovie(_logger, item.Name);
                 continue;
             }
         }
 
-        _logger.LogDebug("Queued {Count} media items", items.Count);
+        LogQueuedItemCount(_logger, items.Count);
     }
 
     // Test if should skip the episode
@@ -218,21 +215,13 @@ public class QueueManager(ILogger<QueueManager> logger, ILibraryManager libraryM
 
         if (string.IsNullOrEmpty(episode.Path))
         {
-            _logger.LogWarning(
-                "Not queuing episode \"{Name}\" from series \"{Series}\" ({Id}) as no path was provided by Jellyfin",
-                episode.Name,
-                episode.SeriesName,
-                episode.Id);
+            LogEpisodeNoPath(_logger, episode.Name, episode.SeriesName, episode.Id);
             return;
         }
 
         if (episode.RunTimeTicks is null)
         {
-            _logger.LogWarning(
-                "Not queuing episode \"{Name}\" from series \"{Series}\" ({Id}) as no duration was provided by Jellyfin",
-                episode.Name,
-                episode.SeriesName,
-                episode.Id);
+            LogEpisodeNoDuration(_logger, episode.Name, episode.SeriesName, episode.Id);
             return;
         }
 
@@ -258,21 +247,13 @@ public class QueueManager(ILogger<QueueManager> logger, ILibraryManager libraryM
 
         if (string.IsNullOrEmpty(source.Path))
         {
-            _logger.LogWarning(
-                "Not queuing movie '{Name} ({Source})' ({Id}) as no path was provided by Jellyfin",
-                movie.Name,
-                source.Name,
-                source.Id);
+            LogMovieNoPath(_logger, movie.Name, source.Name, source.Id);
             return;
         }
 
         if (movie.RunTimeTicks is null)
         {
-            _logger.LogWarning(
-                "Not queuing movie '{Name} ({Source})' ({Id}) as no duration was provided by Jellyfin",
-                movie.Name,
-                source.Name,
-                source.Id);
+            LogMovieNoDuration(_logger, movie.Name, source.Name, source.Id);
             return;
         }
 
@@ -289,4 +270,62 @@ public class QueueManager(ILogger<QueueManager> logger, ILibraryManager libraryM
             IsEpisode = false,
         });
     }
+
+    // Source-generated logging
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Not analyzing library \"{Name}\": not selected by user")]
+    private static partial void LogLibraryNotSelected(ILogger logger, string name);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Running enqueue of items in library {Name} ({ItemId})")]
+    private static partial void LogEnqueueLibrary(ILogger logger, string name, string itemId);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to enqueue items from library {Name}")]
+    private static partial void LogEnqueueFailure(ILogger logger, string name, Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Skipping TV Shows: Failed to parse season number '{Nr}' for tv show: {Name}. Fix your config!")]
+    private static partial void LogSeasonParseFailure(ILogger logger, string nr, string name);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Limiting analysis to the following libraries: {Selected}")]
+    private static partial void LogSelectedLibraries(ILogger logger, string selected);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Not limiting analysis by library name")]
+    private static partial void LogNoLibraryFilter(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Constructing anonymous internal query")]
+    private static partial void LogConstructingQuery(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Getting items")]
+    private static partial void LogGettingItems(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Library query result is null")]
+    private static partial void LogLibraryQueryNull(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Iterating through library items")]
+    private static partial void LogIteratingItems(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Skipping episode: '{EpisodeName}' of series: '{SeriesName} S{Season}'")]
+    private static partial void LogSkippingEpisode(ILogger logger, string episodeName, string seriesName, int? season);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Skipping Movie: '{Name}'")]
+    private static partial void LogSkippingMovie(ILogger logger, string name);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Adding movie: '{Name} ({Format})'")]
+    private static partial void LogAddingMovie(ILogger logger, string name, string format);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Item {Name} is not an episode or movie")]
+    private static partial void LogItemNotEpisodeOrMovie(ILogger logger, string name);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Queued {Count} media items")]
+    private static partial void LogQueuedItemCount(ILogger logger, int count);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Not queuing episode \"{Name}\" from series \"{Series}\" ({Id}) as no path was provided by Jellyfin")]
+    private static partial void LogEpisodeNoPath(ILogger logger, string name, string series, Guid id);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Not queuing episode \"{Name}\" from series \"{Series}\" ({Id}) as no duration was provided by Jellyfin")]
+    private static partial void LogEpisodeNoDuration(ILogger logger, string name, string series, Guid id);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Not queuing movie '{Name} ({Source})' ({Id}) as no path was provided by Jellyfin")]
+    private static partial void LogMovieNoPath(ILogger logger, string name, string source, string id);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Not queuing movie '{Name} ({Source})' ({Id}) as no duration was provided by Jellyfin")]
+    private static partial void LogMovieNoDuration(ILogger logger, string name, string source, string id);
 }

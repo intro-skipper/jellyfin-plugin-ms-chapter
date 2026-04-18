@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using ChapterCreator.Configuration;
-using Jellyfin.Data.Enums;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Common.Plugins;
 using MediaBrowser.Controller.Entities;
@@ -19,7 +18,7 @@ namespace ChapterCreator
     /// <summary>
     /// The main plugin.
     /// </summary>
-    public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
+    public partial class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
         private const string IntroSkipperDataDir = "introskipper";
         private const string ChaptersDir = Constants.ChaptersDirectory;
@@ -115,14 +114,14 @@ namespace ChapterCreator
                 return;
             }
 
-            _logger.LogInformation("Migrating legacy chapter files from {Path}", LegacyChaptersFolderPath);
+            LogMigratingLegacyChapters(_logger, LegacyChaptersFolderPath);
 
             foreach (var file in Directory.GetFiles(LegacyChaptersFolderPath, $"*{Constants.ChapterFileSuffix}.xml"))
             {
                 var stem = Path.GetFileNameWithoutExtension(file); // "{guid}_chapters"
                 if (stem.Length <= Constants.ChapterFileSuffix.Length || !stem.EndsWith(Constants.ChapterFileSuffix, StringComparison.Ordinal))
                 {
-                    _logger.LogDebug("Skipping unrecognised chapter file in chapters folder: {File}", file);
+                    LogSkippingUnrecognisedFile(_logger, file);
                     continue;
                 }
 
@@ -130,14 +129,14 @@ namespace ChapterCreator
 
                 if (!Guid.TryParse(idStr, out var id))
                 {
-                    _logger.LogDebug("Skipping unrecognised chapter file in chapters folder: {File}", file);
+                    LogSkippingUnrecognisedFile(_logger, file);
                     continue;
                 }
 
                 var item = GetItem(id);
                 if (item is null || string.IsNullOrEmpty(item.Path))
                 {
-                    _logger.LogDebug("No library item found for chapter file {File}, leaving in legacy folder", file);
+                    LogNoItemForChapterFile(_logger, file);
                     continue;
                 }
 
@@ -149,14 +148,14 @@ namespace ChapterCreator
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Could not resolve symlink for item {Id} at {Path}, skipping", id, item.Path);
+                    LogSymlinkResolveFailure(_logger, id, item.Path, ex);
                     continue;
                 }
 
                 var dir = Path.GetDirectoryName(realPath);
                 if (string.IsNullOrEmpty(dir))
                 {
-                    _logger.LogWarning("Could not determine directory for item {Id} at {Path}, skipping", id, realPath);
+                    LogCannotDetermineDirectory(_logger, id, realPath);
                     continue;
                 }
 
@@ -167,15 +166,15 @@ namespace ChapterCreator
                     Directory.CreateDirectory(Path.GetDirectoryName(newPath)!);
                     if (File.Exists(newPath))
                     {
-                        _logger.LogDebug("Overwriting existing chapter file at destination: {New}", newPath);
+                        LogOverwritingChapterFile(_logger, newPath);
                     }
 
                     File.Move(file, newPath, overwrite: true);
-                    _logger.LogDebug("Moved chapter file for item {Id}: {Old} -> {New}", id, file, newPath);
+                    LogMovedChapterFile(_logger, id, file, newPath);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Could not move chapter file {File} back next to media", file);
+                    LogMoveChapterFileFailure(_logger, file, ex);
                 }
             }
 
@@ -189,12 +188,12 @@ namespace ChapterCreator
                 if (Directory.Exists(LegacyChaptersFolderPath) && Directory.GetFileSystemEntries(LegacyChaptersFolderPath).Length == 0)
                 {
                     Directory.Delete(LegacyChaptersFolderPath);
-                    _logger.LogInformation("Removed empty legacy chapters folder {Path}", LegacyChaptersFolderPath);
+                    LogRemovedLegacyFolder(_logger, LegacyChaptersFolderPath);
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogDebug(ex, "Could not remove legacy chapters folder {Path}", LegacyChaptersFolderPath);
+                LogRemoveLegacyFolderFailure(_logger, LegacyChaptersFolderPath, ex);
             }
 
             var introSkipperPath = Path.Join(ApplicationPaths.DataPath, IntroSkipperDataDir);
@@ -203,13 +202,44 @@ namespace ChapterCreator
                 if (Directory.Exists(introSkipperPath) && Directory.GetFileSystemEntries(introSkipperPath).Length == 0)
                 {
                     Directory.Delete(introSkipperPath);
-                    _logger.LogInformation("Removed empty legacy data folder {Path}", introSkipperPath);
+                    LogRemovedLegacyFolder(_logger, introSkipperPath);
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogDebug(ex, "Could not remove legacy data folder {Path}", introSkipperPath);
+                LogRemoveLegacyFolderFailure(_logger, introSkipperPath, ex);
             }
         }
+
+        // Source-generated logging
+        [LoggerMessage(Level = LogLevel.Information, Message = "Migrating legacy chapter files from {Path}")]
+        private static partial void LogMigratingLegacyChapters(ILogger logger, string path);
+
+        [LoggerMessage(Level = LogLevel.Debug, Message = "Skipping unrecognised chapter file in chapters folder: {File}")]
+        private static partial void LogSkippingUnrecognisedFile(ILogger logger, string file);
+
+        [LoggerMessage(Level = LogLevel.Debug, Message = "No library item found for chapter file {File}, leaving in legacy folder")]
+        private static partial void LogNoItemForChapterFile(ILogger logger, string file);
+
+        [LoggerMessage(Level = LogLevel.Warning, Message = "Could not resolve symlink for item {Id} at {Path}, skipping")]
+        private static partial void LogSymlinkResolveFailure(ILogger logger, Guid id, string path, Exception ex);
+
+        [LoggerMessage(Level = LogLevel.Warning, Message = "Could not determine directory for item {Id} at {Path}, skipping")]
+        private static partial void LogCannotDetermineDirectory(ILogger logger, Guid id, string path);
+
+        [LoggerMessage(Level = LogLevel.Debug, Message = "Overwriting existing chapter file at destination: {NewPath}")]
+        private static partial void LogOverwritingChapterFile(ILogger logger, string newPath);
+
+        [LoggerMessage(Level = LogLevel.Debug, Message = "Moved chapter file for item {Id}: {OldPath} -> {NewPath}")]
+        private static partial void LogMovedChapterFile(ILogger logger, Guid id, string oldPath, string newPath);
+
+        [LoggerMessage(Level = LogLevel.Warning, Message = "Could not move chapter file {File} back next to media")]
+        private static partial void LogMoveChapterFileFailure(ILogger logger, string file, Exception ex);
+
+        [LoggerMessage(Level = LogLevel.Information, Message = "Removed empty legacy folder {Path}")]
+        private static partial void LogRemovedLegacyFolder(ILogger logger, string path);
+
+        [LoggerMessage(Level = LogLevel.Debug, Message = "Could not remove legacy folder {Path}")]
+        private static partial void LogRemoveLegacyFolderFailure(ILogger logger, string path, Exception ex);
     }
 }
