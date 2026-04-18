@@ -46,7 +46,7 @@ public class CreateChapterTask(
     /// <summary>
     /// Gets the task description.
     /// </summary>
-    public string Description => "Create chapter xml files from Media Segments.";
+    public string Description => "Create chapters from Media Segments.";
 
     /// <summary>
     /// Gets the task key.
