@@ -245,7 +245,7 @@ public partial class ChapterFileManager(ILogger<ChapterFileManager> logger) : IC
     {
         var legacyChaptersDir = Path.Combine(mediaDirectory, Constants.LegacyChaptersDirectory);
         var hiddenChaptersDir = Path.Combine(mediaDirectory, Constants.ChaptersDirectory);
-        if (!Directory.Exists(legacyChaptersDir) || string.Equals(legacyChaptersDir, hiddenChaptersDir, StringComparison.Ordinal))
+        if (!Directory.Exists(legacyChaptersDir) || string.Equals(legacyChaptersDir, hiddenChaptersDir, StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
@@ -269,7 +269,7 @@ public partial class ChapterFileManager(ILogger<ChapterFileManager> logger) : IC
                 File.Move(file, destinationFile, overwrite: true);
             }
 
-            if (Directory.GetFileSystemEntries(legacyChaptersDir).Length == 0)
+            if (!Directory.EnumerateFileSystemEntries(legacyChaptersDir).Any())
             {
                 Directory.Delete(legacyChaptersDir);
                 if (logger is not null)
