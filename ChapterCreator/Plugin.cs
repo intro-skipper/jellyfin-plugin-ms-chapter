@@ -21,7 +21,8 @@ namespace ChapterCreator
     public partial class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
         private const string IntroSkipperDataDir = "introskipper";
-        private const string ChaptersDir = Constants.ChaptersDirectory;
+        private const string LegacyCentralizedChaptersDir = Constants.LegacyChaptersDirectory;
+        private const string MediaAdjacentChaptersDir = Constants.ChaptersDirectory;
 
         private readonly ILibraryManager _libraryManager;
         private readonly IChapterRepository _chapterRepository;
@@ -64,7 +65,7 @@ namespace ChapterCreator
         /// <summary>
         /// Gets the path to the legacy centralized chapters folder inside the introskipper data directory.
         /// </summary>
-        public string LegacyChaptersFolderPath => Path.Join(ApplicationPaths.DataPath, IntroSkipperDataDir, ChaptersDir);
+        public string LegacyChaptersFolderPath => Path.Join(ApplicationPaths.DataPath, IntroSkipperDataDir, LegacyCentralizedChaptersDir);
 
         /// <inheritdoc />
         public IEnumerable<PluginPageInfo> GetPages()
@@ -159,7 +160,7 @@ namespace ChapterCreator
                     continue;
                 }
 
-                var newPath = Path.Combine(dir, ChaptersDir, $"{Path.GetFileNameWithoutExtension(realPath)}{Constants.ChapterFileSuffix}.xml");
+                var newPath = Path.Combine(dir, MediaAdjacentChaptersDir, $"{Path.GetFileNameWithoutExtension(realPath)}{Constants.ChapterFileSuffix}.xml");
 
                 try
                 {
