@@ -13,13 +13,45 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Read version from variable
-        id: read-version
+      - name: Increment patch version
+        shell: bash
         run: |
-          NEW_FILE_VERSION=0.5.1
-          echo "NEW_FILE_VERSION=${NEW_FILE_VERSION}" >> $GITHUB_ENV
           GIT_HASH=$(git rev-parse --short HEAD)
           echo "GIT_HASH=${GIT_HASH}" >> $GITHUB_ENV
+
+          python - <<'PY'
+          import os
+          import re
+
+          path = "Directory.Build.props"
+          with open(path, "r", encoding="utf-8") as file:
+              content = file.read()
+
+          match = re.search(r"<Version>(\d+)\.(\d+)\.(\d+)\.(\d+)</Version>", content)
+          if not match:
+              raise SystemExit("Could not parse <Version> in Directory.Build.props")
+
+          major, minor, patch, revision = match.groups()
+          new_version = f"{major}.{minor}.{int(patch) + 1}.{revision}"
+
+          for tag in ("Version", "AssemblyVersion", "FileVersion"):
+              content, count = re.subn(
+                  rf"<{tag}>\d+\.\d+\.\d+\.\d+</{tag}>",
+                  f"<{tag}>{new_version}</{tag}>",
+                  content,
+                  count=1,
+              )
+              if count != 1:
+                  raise SystemExit(f"Could not update <{tag}> in Directory.Build.props")
+
+          with open(path, "w", encoding="utf-8", newline="\n") as file:
+              file.write(content)
+
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
+              env.write(f"NEW_FILE_VERSION={new_version}\n")
+
+          print(f"Increment patch version to {new_version}")
+          PY
 
       - name: Check for BETA file
         id: check-beta
@@ -62,3 +94,13 @@ jobs:
         run: gh release create "${{ env.NEW_FILE_VERSION }}-${{ env.GIT_HASH }}" "ChapterCreator-${{ env.NEW_FILE_VERSION }}.zip" --title "Release ${{ env.NEW_FILE_VERSION }}-${{ env.GIT_HASH }}" --latest --generate-notes --target master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Commit updated Directory.Build.props
+        if: ${{ inputs.prerelease != true }}
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Directory.Build.props
+          git commit -m "Increment patch version to ${{ env.NEW_FILE_VERSION }}"
+          git push

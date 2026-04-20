@@ -235,8 +235,64 @@ public partial class ChapterFileManager(ILogger<ChapterFileManager> logger) : IC
             throw new InvalidOperationException($"Unable to determine directory for media path '{mediaPath}'");
         }
 
+        MigrateLegacyMediaAdjacentChaptersDirectory(dir, logger);
+
         var chaptersDir = Path.Combine(dir, Constants.ChaptersDirectory);
         return Path.Combine(chaptersDir, $"{Path.GetFileNameWithoutExtension(resolvedPath)}{Constants.ChapterFileSuffix}.xml");
+    }
+
+    private static void MigrateLegacyMediaAdjacentChaptersDirectory(string mediaDirectory, ILogger? logger)
+    {
+        var legacyChaptersDir = Path.Combine(mediaDirectory, Constants.LegacyChaptersDirectory);
+        var hiddenChaptersDir = Path.Combine(mediaDirectory, Constants.ChaptersDirectory);
+        // Guard for case-insensitive file systems where configured folder names could resolve to the same path.
+        if (!Directory.Exists(legacyChaptersDir) || string.Equals(legacyChaptersDir, hiddenChaptersDir, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        try
+        {
+            if (!Directory.Exists(hiddenChaptersDir))
+            {
+                Directory.Move(legacyChaptersDir, hiddenChaptersDir);
+                if (logger is not null)
+                {
+                    LogMigratedLegacyMediaChaptersDirectory(logger, legacyChaptersDir, hiddenChaptersDir);
+                }
+
+                return;
+            }
+
+            foreach (var file in Directory.GetFiles(legacyChaptersDir))
+            {
+                var destinationFile = Path.Combine(hiddenChaptersDir, Path.GetFileName(file));
+                try
+                {
+                    File.Move(file, destinationFile, overwrite: true);
+                }
+                catch (Exception ex)
+                {
+                    if (logger is not null)
+                    {
+                        LogFailedToMoveLegacyChapterFile(logger, file, destinationFile, ex);
+                    }
+                }
+            }
+
+            Directory.Delete(legacyChaptersDir, recursive: true);
+            if (logger is not null)
+            {
+                LogRemovedLegacyMediaChaptersDirectory(logger, legacyChaptersDir);
+            }
+        }
+        catch (Exception ex)
+        {
+            if (logger is not null)
+            {
+                LogFailedToMigrateLegacyMediaChaptersDirectory(logger, legacyChaptersDir, hiddenChaptersDir, ex);
+            }
+        }
     }
 
     private static string TickToTime(long ticks) => TimeSpan.FromTicks(ticks).ToString(@"hh\:mm\:ss\.ff", System.Globalization.CultureInfo.InvariantCulture);
@@ -389,6 +445,18 @@ public partial class ChapterFileManager(ILogger<ChapterFileManager> logger) : IC
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Could not resolve symlink for {Path}, using original path")]
     private static partial void LogSymlinkResolutionFailed(ILogger logger, string path, Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Migrated legacy media chapters directory from {LegacyPath} to {HiddenPath}")]
+    private static partial void LogMigratedLegacyMediaChaptersDirectory(ILogger logger, string legacyPath, string hiddenPath);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Removed empty legacy media chapters directory at {LegacyPath}")]
+    private static partial void LogRemovedLegacyMediaChaptersDirectory(ILogger logger, string legacyPath);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to migrate legacy media chapters directory from {LegacyPath} to {HiddenPath}")]
+    private static partial void LogFailedToMigrateLegacyMediaChaptersDirectory(ILogger logger, string legacyPath, string hiddenPath, Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to move legacy chapter file {SourcePath} to {DestinationPath}")]
+    private static partial void LogFailedToMoveLegacyChapterFile(ILogger logger, string sourcePath, string destinationPath, Exception ex);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "No chapters provided for file {Filename}")]
     private static partial void LogNoChaptersProvided(ILogger logger, string filename);
