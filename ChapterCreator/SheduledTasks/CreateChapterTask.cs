@@ -36,7 +36,7 @@ public class CreateChapterTask(
     /// <summary>
     /// Gets the task name.
     /// </summary>
-    public string Name => "Create Chapter Markers";
+    public string Name => "Generate Chapter Markers";
 
     /// <summary>
     /// Gets the task category.
@@ -46,7 +46,7 @@ public class CreateChapterTask(
     /// <summary>
     /// Gets the task description.
     /// </summary>
-    public string Description => "Create chapter markers from Media Segments.";
+    public string Description => "Write media segments as chapter markers to XML or the Jellyfin database.";
 
     /// <summary>
     /// Gets the task key.
