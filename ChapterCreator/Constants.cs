@@ -1,3 +1,7 @@
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("ChapterCreator.Tests")]
+
 namespace ChapterCreator
 {
     /// <summary>

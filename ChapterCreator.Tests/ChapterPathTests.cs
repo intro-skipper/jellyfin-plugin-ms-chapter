@@ -8,10 +8,6 @@ namespace ChapterCreator.Tests;
 
 public class ChapterPathTests
 {
-    private const string LegacyChaptersDirectory = "chapters";
-    private const string HiddenChaptersDirectory = ".chapters";
-    private const string ChapterFileSuffix = "_chapters";
-
     [Fact]
     public void GetChapterPath_UsesHiddenDirectory_AndMigratesLegacyFolder()
     {
@@ -23,11 +19,11 @@ public class ChapterPathTests
             var mediaFilePath = Path.Combine(tempRoot, "Episode01.mkv");
             File.WriteAllText(mediaFilePath, string.Empty);
 
-            var legacyChapterDirectory = Path.Combine(tempRoot, LegacyChaptersDirectory);
+            var legacyChapterDirectory = Path.Combine(tempRoot, Constants.LegacyChaptersDirectory);
             Directory.CreateDirectory(legacyChapterDirectory);
             var legacyChapterFile = Path.Combine(
                 legacyChapterDirectory,
-                $"{Path.GetFileNameWithoutExtension(mediaFilePath)}{ChapterFileSuffix}.xml");
+                $"{Path.GetFileNameWithoutExtension(mediaFilePath)}{Constants.ChapterFileSuffix}.xml");
             File.WriteAllText(legacyChapterFile, "<Chapters />");
 
             var method = typeof(ChapterFileManager).GetMethod(
@@ -39,8 +35,8 @@ public class ChapterPathTests
             var chapterPath = method!.Invoke(null, [mediaFilePath, null]) as string;
             var expectedPath = Path.Combine(
                 tempRoot,
-                HiddenChaptersDirectory,
-                $"{Path.GetFileNameWithoutExtension(mediaFilePath)}{ChapterFileSuffix}.xml");
+                Constants.ChaptersDirectory,
+                $"{Path.GetFileNameWithoutExtension(mediaFilePath)}{Constants.ChapterFileSuffix}.xml");
 
             Assert.Equal(expectedPath, chapterPath);
             Assert.True(File.Exists(expectedPath));
@@ -66,13 +62,13 @@ public class ChapterPathTests
             var mediaFilePath = Path.Combine(tempRoot, "Episode02.mkv");
             File.WriteAllText(mediaFilePath, string.Empty);
 
-            var fileName = $"{Path.GetFileNameWithoutExtension(mediaFilePath)}{ChapterFileSuffix}.xml";
-            var hiddenChapterDirectory = Path.Combine(tempRoot, HiddenChaptersDirectory);
+            var fileName = $"{Path.GetFileNameWithoutExtension(mediaFilePath)}{Constants.ChapterFileSuffix}.xml";
+            var hiddenChapterDirectory = Path.Combine(tempRoot, Constants.ChaptersDirectory);
             Directory.CreateDirectory(hiddenChapterDirectory);
             var hiddenChapterFile = Path.Combine(hiddenChapterDirectory, fileName);
             File.WriteAllText(hiddenChapterFile, "<Chapters><EditionEntry /></Chapters>");
 
-            var legacyChapterDirectory = Path.Combine(tempRoot, LegacyChaptersDirectory);
+            var legacyChapterDirectory = Path.Combine(tempRoot, Constants.LegacyChaptersDirectory);
             Directory.CreateDirectory(legacyChapterDirectory);
             var legacyChapterFile = Path.Combine(legacyChapterDirectory, fileName);
             File.WriteAllText(legacyChapterFile, "<Chapters />");
