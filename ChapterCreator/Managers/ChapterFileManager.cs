@@ -245,6 +245,7 @@ public partial class ChapterFileManager(ILogger<ChapterFileManager> logger) : IC
     {
         var legacyChaptersDir = Path.Combine(mediaDirectory, Constants.LegacyChaptersDirectory);
         var hiddenChaptersDir = Path.Combine(mediaDirectory, Constants.ChaptersDirectory);
+        // Guard for case-insensitive file systems where configured folder names could resolve to the same path.
         if (!Directory.Exists(legacyChaptersDir) || string.Equals(legacyChaptersDir, hiddenChaptersDir, StringComparison.OrdinalIgnoreCase))
         {
             return;
@@ -266,7 +267,17 @@ public partial class ChapterFileManager(ILogger<ChapterFileManager> logger) : IC
             foreach (var file in Directory.GetFiles(legacyChaptersDir))
             {
                 var destinationFile = Path.Combine(hiddenChaptersDir, Path.GetFileName(file));
-                File.Move(file, destinationFile, overwrite: true);
+                try
+                {
+                    File.Move(file, destinationFile, overwrite: true);
+                }
+                catch (Exception ex)
+                {
+                    if (logger is not null)
+                    {
+                        LogFailedToMoveLegacyChapterFile(logger, file, destinationFile, ex);
+                    }
+                }
             }
 
             using var legacyEntriesEnumerator = Directory.EnumerateFileSystemEntries(legacyChaptersDir).GetEnumerator();
@@ -447,6 +458,9 @@ public partial class ChapterFileManager(ILogger<ChapterFileManager> logger) : IC
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to migrate legacy media chapters directory from {LegacyPath} to {HiddenPath}")]
     private static partial void LogFailedToMigrateLegacyMediaChaptersDirectory(ILogger logger, string legacyPath, string hiddenPath, Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to move legacy chapter file {SourcePath} to {DestinationPath}")]
+    private static partial void LogFailedToMoveLegacyChapterFile(ILogger logger, string sourcePath, string destinationPath, Exception ex);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "No chapters provided for file {Filename}")]
     private static partial void LogNoChaptersProvided(ILogger logger, string filename);
