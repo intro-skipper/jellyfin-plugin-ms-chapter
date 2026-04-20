@@ -280,14 +280,10 @@ public partial class ChapterFileManager(ILogger<ChapterFileManager> logger) : IC
                 }
             }
 
-            using var legacyEntriesEnumerator = Directory.EnumerateFileSystemEntries(legacyChaptersDir).GetEnumerator();
-            if (!legacyEntriesEnumerator.MoveNext())
+            Directory.Delete(legacyChaptersDir, recursive: true);
+            if (logger is not null)
             {
-                Directory.Delete(legacyChaptersDir);
-                if (logger is not null)
-                {
-                    LogRemovedLegacyMediaChaptersDirectory(logger, legacyChaptersDir);
-                }
+                LogRemovedLegacyMediaChaptersDirectory(logger, legacyChaptersDir);
             }
         }
         catch (Exception ex)
