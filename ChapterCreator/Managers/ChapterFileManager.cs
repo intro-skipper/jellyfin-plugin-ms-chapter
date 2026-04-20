@@ -269,7 +269,8 @@ public partial class ChapterFileManager(ILogger<ChapterFileManager> logger) : IC
                 File.Move(file, destinationFile, overwrite: true);
             }
 
-            if (!Directory.EnumerateFileSystemEntries(legacyChaptersDir).Any())
+            using var legacyEntriesEnumerator = Directory.EnumerateFileSystemEntries(legacyChaptersDir).GetEnumerator();
+            if (!legacyEntriesEnumerator.MoveNext())
             {
                 Directory.Delete(legacyChaptersDir);
                 if (logger is not null)
