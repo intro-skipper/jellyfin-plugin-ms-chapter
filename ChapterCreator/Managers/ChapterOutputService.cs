@@ -268,39 +268,39 @@ public partial class ChapterOutputService(
         LogInjectedChapters(_logger, chapterInfos.Count, itemId);
     }
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to write XML chapter file for item {Id}")]
+    [LoggerMessage(EventId = 1100, Level = LogLevel.Error, Message = "Failed to write XML chapter file for item {Id}")]
     private static partial void LogXmlWriteFailure(ILogger logger, Guid id, Exception ex);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to inject chapters into Jellyfin DB for item {Id}")]
+    [LoggerMessage(EventId = 1101, Level = LogLevel.Error, Message = "Failed to inject chapters into Jellyfin DB for item {Id}")]
     private static partial void LogDbInjectionFailure(ILogger logger, Guid id, Exception ex);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Skip XML import for {Id}: unable to get item path")]
+    [LoggerMessage(EventId = 1102, Level = LogLevel.Debug, Message = "Skip XML import for {Id}: unable to get item path")]
     private static partial void LogSkipXmlImportNoPath(ILogger logger, Guid id);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Skip XML import for {Id}: could not resolve chapter path")]
+    [LoggerMessage(EventId = 1103, Level = LogLevel.Debug, Message = "Skip XML import for {Id}: could not resolve chapter path")]
     private static partial void LogSkipXmlImportNoChapterPath(ILogger logger, Guid id, Exception ex);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "No XML chapter file found at {Path} for item {Id}")]
+    [LoggerMessage(EventId = 1104, Level = LogLevel.Debug, Message = "No XML chapter file found at {Path} for item {Id}")]
     private static partial void LogNoXmlFileFound(ILogger logger, string path, Guid id);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Item {Id} is not a Video, skipping XML chapter import")]
+    [LoggerMessage(EventId = 1105, Level = LogLevel.Warning, Message = "Item {Id} is not a Video, skipping XML chapter import")]
     private static partial void LogNotAVideo(ILogger logger, Guid id);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Imported {Count} chapters from XML for item {Id}")]
+    [LoggerMessage(EventId = 1106, Level = LogLevel.Debug, Message = "Imported {Count} chapters from XML for item {Id}")]
     private static partial void LogImportedChapters(ILogger logger, int count, Guid id);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to import chapters from XML file {Path} for item {Id}")]
+    [LoggerMessage(EventId = 1107, Level = LogLevel.Error, Message = "Failed to import chapters from XML file {Path} for item {Id}")]
     private static partial void LogXmlImportFailure(ILogger logger, string path, Guid id, Exception ex);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Item {Id} is not a Video, skipping Jellyfin chapter injection")]
+    [LoggerMessage(EventId = 1108, Level = LogLevel.Warning, Message = "Item {Id} is not a Video, skipping Jellyfin chapter injection")]
     private static partial void LogNotAVideoInjection(ILogger logger, Guid id);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "No chapters generated for item {Id}, skipping injection")]
+    [LoggerMessage(EventId = 1109, Level = LogLevel.Debug, Message = "No chapters generated for item {Id}, skipping injection")]
     private static partial void LogNoChaptersGenerated(ILogger logger, Guid id);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Skipping chapter with unparseable StartTime '{StartTime}' for item {Id}")]
+    [LoggerMessage(EventId = 1110, Level = LogLevel.Warning, Message = "Skipping chapter with unparseable StartTime '{StartTime}' for item {Id}")]
     private static partial void LogUnparseableStartTime(ILogger logger, string startTime, Guid id);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Injected {Count} chapters into Jellyfin DB for item {Id}")]
+    [LoggerMessage(EventId = 1111, Level = LogLevel.Debug, Message = "Injected {Count} chapters into Jellyfin DB for item {Id}")]
     private static partial void LogInjectedChapters(ILogger logger, int count, Guid id);
 }

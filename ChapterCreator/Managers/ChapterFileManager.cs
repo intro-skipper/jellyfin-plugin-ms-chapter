@@ -413,63 +413,63 @@ public partial class ChapterFileManager(ILogger<ChapterFileManager> logger) : IC
 
     // Source-generated logging methods
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Overwrite Chapter files: {OverwriteFiles}")]
+    [LoggerMessage(EventId = 1300, Level = LogLevel.Debug, Message = "Overwrite Chapter files: {OverwriteFiles}")]
     private static partial void LogOverwriteSetting(ILogger logger, bool overwriteFiles);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Max Parallelism: {MaxParallelism}")]
+    [LoggerMessage(EventId = 1301, Level = LogLevel.Debug, Message = "Max Parallelism: {MaxParallelism}")]
     private static partial void LogMaxParallelism(ILogger logger, int maxParallelism);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Skipping item {Id} as it already has embedded chapters")]
+    [LoggerMessage(EventId = 1302, Level = LogLevel.Debug, Message = "Skipping item {Id} as it already has embedded chapters")]
     private static partial void LogSkippingEmbeddedChapters(ILogger logger, Guid id);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Processing chapters for item {Id}")]
+    [LoggerMessage(EventId = 1303, Level = LogLevel.Debug, Message = "Processing chapters for item {Id}")]
     private static partial void LogProcessingChapters(ILogger logger, Guid id);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Skip id ({Id}): no chapter data generated")]
+    [LoggerMessage(EventId = 1304, Level = LogLevel.Debug, Message = "Skip id ({Id}): no chapter data generated")]
     private static partial void LogNoChapterData(ILogger logger, Guid id);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Skip id ({Id}): unable to get item path")]
+    [LoggerMessage(EventId = 1305, Level = LogLevel.Warning, Message = "Skip id ({Id}): unable to get item path")]
     private static partial void LogUnableToGetPath(ILogger logger, Guid id);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Skip id ({Id}): media file not found at {Path}")]
+    [LoggerMessage(EventId = 1306, Level = LogLevel.Warning, Message = "Skip id ({Id}): media file not found at {Path}")]
     private static partial void LogMediaFileNotFound(ILogger logger, Guid id, string path);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Writing chapters to {Path}")]
+    [LoggerMessage(EventId = 1307, Level = LogLevel.Debug, Message = "Writing chapters to {Path}")]
     private static partial void LogWritingChapters(ILogger logger, string path);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Successfully created chapter file for {Id} at {Path}")]
+    [LoggerMessage(EventId = 1308, Level = LogLevel.Debug, Message = "Successfully created chapter file for {Id} at {Path}")]
     private static partial void LogChapterFileCreated(ILogger logger, Guid id, string path);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to create chapter file for item {Id}")]
+    [LoggerMessage(EventId = 1309, Level = LogLevel.Error, Message = "Failed to create chapter file for item {Id}")]
     private static partial void LogChapterFileError(ILogger logger, Guid id, Exception ex);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Could not resolve symlink for {Path}, using original path")]
+    [LoggerMessage(EventId = 1310, Level = LogLevel.Debug, Message = "Could not resolve symlink for {Path}, using original path")]
     private static partial void LogSymlinkResolutionFailed(ILogger logger, string path, Exception ex);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Migrated legacy media chapters directory from {LegacyPath} to {HiddenPath}")]
+    [LoggerMessage(EventId = 1311, Level = LogLevel.Information, Message = "Migrated legacy media chapters directory from {LegacyPath} to {HiddenPath}")]
     private static partial void LogMigratedLegacyMediaChaptersDirectory(ILogger logger, string legacyPath, string hiddenPath);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Removed empty legacy media chapters directory at {LegacyPath}")]
+    [LoggerMessage(EventId = 1312, Level = LogLevel.Information, Message = "Removed empty legacy media chapters directory at {LegacyPath}")]
     private static partial void LogRemovedLegacyMediaChaptersDirectory(ILogger logger, string legacyPath);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to migrate legacy media chapters directory from {LegacyPath} to {HiddenPath}")]
+    [LoggerMessage(EventId = 1313, Level = LogLevel.Warning, Message = "Failed to migrate legacy media chapters directory from {LegacyPath} to {HiddenPath}")]
     private static partial void LogFailedToMigrateLegacyMediaChaptersDirectory(ILogger logger, string legacyPath, string hiddenPath, Exception ex);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to move legacy chapter file {SourcePath} to {DestinationPath}")]
+    [LoggerMessage(EventId = 1314, Level = LogLevel.Warning, Message = "Failed to move legacy chapter file {SourcePath} to {DestinationPath}")]
     private static partial void LogFailedToMoveLegacyChapterFile(ILogger logger, string sourcePath, string destinationPath, Exception ex);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "No chapters provided for file {Filename}")]
+    [LoggerMessage(EventId = 1315, Level = LogLevel.Debug, Message = "No chapters provided for file {Filename}")]
     private static partial void LogNoChaptersProvided(ILogger logger, string filename);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Skipping existing chapter file {Filename} (overwrite disabled)")]
+    [LoggerMessage(EventId = 1316, Level = LogLevel.Debug, Message = "Skipping existing chapter file {Filename} (overwrite disabled)")]
     private static partial void LogSkippingExistingFile(ILogger logger, string filename);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Overwriting existing chapter file {Filename}")]
+    [LoggerMessage(EventId = 1317, Level = LogLevel.Debug, Message = "Overwriting existing chapter file {Filename}")]
     private static partial void LogOverwritingFile(ILogger logger, string filename);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Ensuring directory exists: {Directory}")]
+    [LoggerMessage(EventId = 1318, Level = LogLevel.Debug, Message = "Ensuring directory exists: {Directory}")]
     private static partial void LogEnsureDirectory(ILogger logger, string directory);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Writing {Count} chapters to {Filename}")]
+    [LoggerMessage(EventId = 1319, Level = LogLevel.Debug, Message = "Writing {Count} chapters to {Filename}")]
     private static partial void LogWritingChapterCount(ILogger logger, int count, string filename);
 }

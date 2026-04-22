@@ -272,60 +272,60 @@ public partial class QueueManager(ILogger<QueueManager> logger, ILibraryManager 
     }
 
     // Source-generated logging
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Not analyzing library \"{Name}\": not selected by user")]
+    [LoggerMessage(EventId = 1200, Level = LogLevel.Debug, Message = "Not analyzing library \"{Name}\": not selected by user")]
     private static partial void LogLibraryNotSelected(ILogger logger, string name);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Running enqueue of items in library {Name} ({ItemId})")]
+    [LoggerMessage(EventId = 1201, Level = LogLevel.Information, Message = "Running enqueue of items in library {Name} ({ItemId})")]
     private static partial void LogEnqueueLibrary(ILogger logger, string name, string itemId);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to enqueue items from library {Name}")]
+    [LoggerMessage(EventId = 1202, Level = LogLevel.Error, Message = "Failed to enqueue items from library {Name}")]
     private static partial void LogEnqueueFailure(ILogger logger, string name, Exception ex);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Skipping TV Shows: Failed to parse season number '{Nr}' for tv show: {Name}. Fix your config!")]
+    [LoggerMessage(EventId = 1203, Level = LogLevel.Error, Message = "Skipping TV Shows: Failed to parse season number '{Nr}' for tv show: {Name}. Fix your config!")]
     private static partial void LogSeasonParseFailure(ILogger logger, string nr, string name);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Limiting analysis to the following libraries: {Selected}")]
+    [LoggerMessage(EventId = 1204, Level = LogLevel.Information, Message = "Limiting analysis to the following libraries: {Selected}")]
     private static partial void LogSelectedLibraries(ILogger logger, string selected);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Not limiting analysis by library name")]
+    [LoggerMessage(EventId = 1205, Level = LogLevel.Debug, Message = "Not limiting analysis by library name")]
     private static partial void LogNoLibraryFilter(ILogger logger);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Constructing anonymous internal query")]
+    [LoggerMessage(EventId = 1206, Level = LogLevel.Debug, Message = "Constructing anonymous internal query")]
     private static partial void LogConstructingQuery(ILogger logger);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Getting items")]
+    [LoggerMessage(EventId = 1207, Level = LogLevel.Debug, Message = "Getting items")]
     private static partial void LogGettingItems(ILogger logger);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Library query result is null")]
+    [LoggerMessage(EventId = 1208, Level = LogLevel.Error, Message = "Library query result is null")]
     private static partial void LogLibraryQueryNull(ILogger logger);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Iterating through library items")]
+    [LoggerMessage(EventId = 1209, Level = LogLevel.Debug, Message = "Iterating through library items")]
     private static partial void LogIteratingItems(ILogger logger);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Skipping episode: '{EpisodeName}' of series: '{SeriesName} S{Season}'")]
+    [LoggerMessage(EventId = 1210, Level = LogLevel.Information, Message = "Skipping episode: '{EpisodeName}' of series: '{SeriesName} S{Season}'")]
     private static partial void LogSkippingEpisode(ILogger logger, string episodeName, string seriesName, int? season);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Skipping Movie: '{Name}'")]
+    [LoggerMessage(EventId = 1211, Level = LogLevel.Information, Message = "Skipping Movie: '{Name}'")]
     private static partial void LogSkippingMovie(ILogger logger, string name);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Adding movie: '{Name} ({Format})'")]
+    [LoggerMessage(EventId = 1212, Level = LogLevel.Information, Message = "Adding movie: '{Name} ({Format})'")]
     private static partial void LogAddingMovie(ILogger logger, string name, string format);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Item {Name} is not an episode or movie")]
+    [LoggerMessage(EventId = 1213, Level = LogLevel.Debug, Message = "Item {Name} is not an episode or movie")]
     private static partial void LogItemNotEpisodeOrMovie(ILogger logger, string name);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Queued {Count} media items")]
+    [LoggerMessage(EventId = 1214, Level = LogLevel.Debug, Message = "Queued {Count} media items")]
     private static partial void LogQueuedItemCount(ILogger logger, int count);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Not queuing episode \"{Name}\" from series \"{Series}\" ({Id}) as no path was provided by Jellyfin")]
+    [LoggerMessage(EventId = 1215, Level = LogLevel.Warning, Message = "Not queuing episode \"{Name}\" from series \"{Series}\" ({Id}) as no path was provided by Jellyfin")]
     private static partial void LogEpisodeNoPath(ILogger logger, string name, string series, Guid id);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Not queuing episode \"{Name}\" from series \"{Series}\" ({Id}) as no duration was provided by Jellyfin")]
+    [LoggerMessage(EventId = 1216, Level = LogLevel.Warning, Message = "Not queuing episode \"{Name}\" from series \"{Series}\" ({Id}) as no duration was provided by Jellyfin")]
     private static partial void LogEpisodeNoDuration(ILogger logger, string name, string series, Guid id);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Not queuing movie '{Name} ({Source})' ({Id}) as no path was provided by Jellyfin")]
+    [LoggerMessage(EventId = 1217, Level = LogLevel.Warning, Message = "Not queuing movie '{Name} ({Source})' ({Id}) as no path was provided by Jellyfin")]
     private static partial void LogMovieNoPath(ILogger logger, string name, string source, string id);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Not queuing movie '{Name} ({Source})' ({Id}) as no duration was provided by Jellyfin")]
+    [LoggerMessage(EventId = 1218, Level = LogLevel.Warning, Message = "Not queuing movie '{Name} ({Source})' ({Id}) as no duration was provided by Jellyfin")]
     private static partial void LogMovieNoDuration(ILogger logger, string name, string source, string id);
 }

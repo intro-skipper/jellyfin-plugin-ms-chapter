@@ -213,34 +213,34 @@ namespace ChapterCreator
         }
 
         // Source-generated logging
-        [LoggerMessage(Level = LogLevel.Information, Message = "Migrating legacy chapter files from {Path}")]
+        [LoggerMessage(EventId = 1400, Level = LogLevel.Information, Message = "Migrating legacy chapter files from {Path}")]
         private static partial void LogMigratingLegacyChapters(ILogger logger, string path);
 
-        [LoggerMessage(Level = LogLevel.Debug, Message = "Skipping unrecognised chapter file in chapters folder: {File}")]
+        [LoggerMessage(EventId = 1401, Level = LogLevel.Debug, Message = "Skipping unrecognised chapter file in chapters folder: {File}")]
         private static partial void LogSkippingUnrecognisedFile(ILogger logger, string file);
 
-        [LoggerMessage(Level = LogLevel.Debug, Message = "No library item found for chapter file {File}, leaving in legacy folder")]
+        [LoggerMessage(EventId = 1402, Level = LogLevel.Debug, Message = "No library item found for chapter file {File}, leaving in legacy folder")]
         private static partial void LogNoItemForChapterFile(ILogger logger, string file);
 
-        [LoggerMessage(Level = LogLevel.Warning, Message = "Could not resolve symlink for item {Id} at {Path}, skipping")]
+        [LoggerMessage(EventId = 1403, Level = LogLevel.Warning, Message = "Could not resolve symlink for item {Id} at {Path}, skipping")]
         private static partial void LogSymlinkResolveFailure(ILogger logger, Guid id, string path, Exception ex);
 
-        [LoggerMessage(Level = LogLevel.Warning, Message = "Could not determine directory for item {Id} at {Path}, skipping")]
+        [LoggerMessage(EventId = 1404, Level = LogLevel.Warning, Message = "Could not determine directory for item {Id} at {Path}, skipping")]
         private static partial void LogCannotDetermineDirectory(ILogger logger, Guid id, string path);
 
-        [LoggerMessage(Level = LogLevel.Debug, Message = "Overwriting existing chapter file at destination: {NewPath}")]
+        [LoggerMessage(EventId = 1405, Level = LogLevel.Debug, Message = "Overwriting existing chapter file at destination: {NewPath}")]
         private static partial void LogOverwritingChapterFile(ILogger logger, string newPath);
 
-        [LoggerMessage(Level = LogLevel.Debug, Message = "Moved chapter file for item {Id}: {OldPath} -> {NewPath}")]
+        [LoggerMessage(EventId = 1406, Level = LogLevel.Debug, Message = "Moved chapter file for item {Id}: {OldPath} -> {NewPath}")]
         private static partial void LogMovedChapterFile(ILogger logger, Guid id, string oldPath, string newPath);
 
-        [LoggerMessage(Level = LogLevel.Warning, Message = "Could not move chapter file {File} back next to media")]
+        [LoggerMessage(EventId = 1407, Level = LogLevel.Warning, Message = "Could not move chapter file {File} back next to media")]
         private static partial void LogMoveChapterFileFailure(ILogger logger, string file, Exception ex);
 
-        [LoggerMessage(Level = LogLevel.Information, Message = "Removed empty legacy folder {Path}")]
+        [LoggerMessage(EventId = 1408, Level = LogLevel.Information, Message = "Removed empty legacy folder {Path}")]
         private static partial void LogRemovedLegacyFolder(ILogger logger, string path);
 
-        [LoggerMessage(Level = LogLevel.Debug, Message = "Could not remove legacy folder {Path}")]
+        [LoggerMessage(EventId = 1409, Level = LogLevel.Debug, Message = "Could not remove legacy folder {Path}")]
         private static partial void LogRemoveLegacyFolderFailure(ILogger logger, string path, Exception ex);
     }
 }
