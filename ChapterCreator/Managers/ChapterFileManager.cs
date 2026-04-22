@@ -6,6 +6,8 @@ using System.Xml;
 using ChapterCreator.Configuration;
 using ChapterCreator.Data;
 using Jellyfin.Database.Implementations.Enums;
+using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.Persistence;
 using MediaBrowser.Model.MediaSegments;
 using Microsoft.Extensions.Logging;
 
@@ -18,31 +20,29 @@ namespace ChapterCreator.Managers;
 /// Initializes a new instance of the <see cref="ChapterFileManager"/> class.
 /// </remarks>
 /// <param name="logger">The logger instance.</param>
-public partial class ChapterFileManager(ILogger<ChapterFileManager> logger) : IChapterFileManager
+/// <param name="libraryManager">The library manager.</param>
+/// <param name="chapterRepository">The chapter repository.</param>
+/// <param name="configurationAccessor">The plugin configuration accessor.</param>
+public partial class ChapterFileManager(
+    ILogger<ChapterFileManager> logger,
+    ILibraryManager libraryManager,
+    IChapterRepository chapterRepository,
+    IPluginConfigurationAccessor configurationAccessor) : IChapterFileManager
 {
     private readonly ILogger<ChapterFileManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly PluginConfiguration? _configuration;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="ChapterFileManager"/> class.
-    /// Used for unit testing to inject a specific configuration without requiring Plugin.Instance.
-    /// </summary>
-    /// <param name="logger">The logger.</param>
-    /// <param name="configuration">The plugin configuration. If null, will try to use Plugin.Instance.Configuration or create a new one.</param>
-    public ChapterFileManager(ILogger<ChapterFileManager> logger, PluginConfiguration? configuration) : this(logger)
-    {
-        _configuration = configuration;
-    }
+    private readonly ILibraryManager _libraryManager = libraryManager;
+    private readonly IChapterRepository _chapterRepository = chapterRepository;
+    private readonly IPluginConfigurationAccessor _configurationAccessor = configurationAccessor;
 
     private PluginConfiguration EffectiveConfiguration =>
-        _configuration ?? Plugin.Instance?.Configuration ?? new PluginConfiguration();
+        _configurationAccessor.GetConfiguration();
 
     /// <summary>
     /// Logs the configuration that will be used during Chapter file creation.
     /// </summary>
     public void LogConfiguration()
     {
-        var config = Plugin.Instance!.Configuration;
+        var config = EffectiveConfiguration;
 
         LogOverwriteSetting(_logger, config.OverwriteFiles);
         LogMaxParallelism(_logger, config.MaxParallelism);
@@ -59,10 +59,10 @@ public partial class ChapterFileManager(ILogger<ChapterFileManager> logger) : IC
 
         var id = psegment.Key;
         var segments = psegment.Value;
-        var config = Plugin.Instance!.Configuration;
+        var config = EffectiveConfiguration;
         var overwrite = config.OverwriteFiles || forceOverwrite;
 
-        var embeddedChapters = Plugin.Instance.GetChapters(id);
+        var embeddedChapters = _chapterRepository.GetChapters(id);
         if (!forceOverwrite && embeddedChapters.Count > 0 && config.SkipEmbeddedChapters)
         {
             LogSkippingEmbeddedChapters(_logger, id);
@@ -81,7 +81,7 @@ public partial class ChapterFileManager(ILogger<ChapterFileManager> logger) : IC
                 return;
             }
 
-            var filePath = Plugin.Instance!.GetItemPath(id);
+            var filePath = _libraryManager.GetItemById(id)?.Path ?? string.Empty;
             if (string.IsNullOrEmpty(filePath))
             {
                 LogUnableToGetPath(_logger, id);
@@ -123,8 +123,7 @@ public partial class ChapterFileManager(ILogger<ChapterFileManager> logger) : IC
         var config = EffectiveConfiguration;
 
         // Get episode runtime from item
-        var item = Plugin.Instance?.GetItem(id);
-        var runtime = item?.RunTimeTicks ?? 0;
+        var runtime = GetRuntimeTicks(id);
 
         var chapters = new List<Chapter>();
         MediaSegmentDto? previousSegment = null;
@@ -174,22 +173,30 @@ public partial class ChapterFileManager(ILogger<ChapterFileManager> logger) : IC
                 });
             }
 
-            // Add final chapter if there's significant runtime remaining
-            if (hasSeenOutro && runtime > 0 && segment == segments.Last() && runtime - segment.EndTicks >= maxGap)
-            {
-                var placeholderName = hasSeenOutro ? config.Epilogue : config.Main;
-                chapters.Add(new Chapter
-                {
-                    StartTime = TickToTime(segment.EndTicks),
-                    EndTime = TickToTime(runtime),
-                    Title = placeholderName
-                });
-            }
-
             previousSegment = segment;
         }
 
+        if (previousSegment is not null && runtime > previousSegment.EndTicks && runtime - previousSegment.EndTicks >= maxGap)
+        {
+            chapters.Add(new Chapter
+            {
+                StartTime = TickToTime(previousSegment.EndTicks),
+                EndTime = TickToTime(runtime),
+                Title = hasSeenOutro ? config.Epilogue : config.Main
+            });
+        }
+
         return chapters;
+    }
+
+    /// <summary>
+    /// Gets the runtime ticks for the specified item.
+    /// </summary>
+    /// <param name="id">The item identifier.</param>
+    /// <returns>The runtime ticks for the item, or <c>0</c> when unavailable.</returns>
+    protected virtual long GetRuntimeTicks(Guid id)
+    {
+        return _libraryManager.GetItemById(id)?.RunTimeTicks ?? 0;
     }
 
     private static string GetChapterName(MediaSegmentType type, PluginConfiguration config)
@@ -446,30 +453,30 @@ public partial class ChapterFileManager(ILogger<ChapterFileManager> logger) : IC
     [LoggerMessage(EventId = 1310, Level = LogLevel.Debug, Message = "Could not resolve symlink for {Path}, using original path")]
     private static partial void LogSymlinkResolutionFailed(ILogger logger, string path, Exception ex);
 
-    [LoggerMessage(EventId = 1311, Level = LogLevel.Information, Message = "Migrated legacy media chapters directory from {LegacyPath} to {HiddenPath}")]
+    [LoggerMessage(EventId = 1316, Level = LogLevel.Information, Message = "Migrated legacy media chapters directory from {LegacyPath} to {HiddenPath}")]
     private static partial void LogMigratedLegacyMediaChaptersDirectory(ILogger logger, string legacyPath, string hiddenPath);
 
-    [LoggerMessage(EventId = 1312, Level = LogLevel.Information, Message = "Removed empty legacy media chapters directory at {LegacyPath}")]
+    [LoggerMessage(EventId = 1317, Level = LogLevel.Information, Message = "Removed empty legacy media chapters directory at {LegacyPath}")]
     private static partial void LogRemovedLegacyMediaChaptersDirectory(ILogger logger, string legacyPath);
 
-    [LoggerMessage(EventId = 1313, Level = LogLevel.Warning, Message = "Failed to migrate legacy media chapters directory from {LegacyPath} to {HiddenPath}")]
+    [LoggerMessage(EventId = 1318, Level = LogLevel.Warning, Message = "Failed to migrate legacy media chapters directory from {LegacyPath} to {HiddenPath}")]
     private static partial void LogFailedToMigrateLegacyMediaChaptersDirectory(ILogger logger, string legacyPath, string hiddenPath, Exception ex);
 
-    [LoggerMessage(EventId = 1314, Level = LogLevel.Warning, Message = "Failed to move legacy chapter file {SourcePath} to {DestinationPath}")]
+    [LoggerMessage(EventId = 1319, Level = LogLevel.Warning, Message = "Failed to move legacy chapter file {SourcePath} to {DestinationPath}")]
     private static partial void LogFailedToMoveLegacyChapterFile(ILogger logger, string sourcePath, string destinationPath, Exception ex);
 
-    [LoggerMessage(EventId = 1315, Level = LogLevel.Debug, Message = "No chapters provided for file {Filename}")]
+    [LoggerMessage(EventId = 1311, Level = LogLevel.Debug, Message = "No chapters provided for file {Filename}")]
     private static partial void LogNoChaptersProvided(ILogger logger, string filename);
 
-    [LoggerMessage(EventId = 1316, Level = LogLevel.Debug, Message = "Skipping existing chapter file {Filename} (overwrite disabled)")]
+    [LoggerMessage(EventId = 1312, Level = LogLevel.Debug, Message = "Skipping existing chapter file {Filename} (overwrite disabled)")]
     private static partial void LogSkippingExistingFile(ILogger logger, string filename);
 
-    [LoggerMessage(EventId = 1317, Level = LogLevel.Debug, Message = "Overwriting existing chapter file {Filename}")]
+    [LoggerMessage(EventId = 1313, Level = LogLevel.Debug, Message = "Overwriting existing chapter file {Filename}")]
     private static partial void LogOverwritingFile(ILogger logger, string filename);
 
-    [LoggerMessage(EventId = 1318, Level = LogLevel.Debug, Message = "Ensuring directory exists: {Directory}")]
+    [LoggerMessage(EventId = 1314, Level = LogLevel.Debug, Message = "Ensuring directory exists: {Directory}")]
     private static partial void LogEnsureDirectory(ILogger logger, string directory);
 
-    [LoggerMessage(EventId = 1319, Level = LogLevel.Debug, Message = "Writing {Count} chapters to {Filename}")]
+    [LoggerMessage(EventId = 1315, Level = LogLevel.Debug, Message = "Writing {Count} chapters to {Filename}")]
     private static partial void LogWritingChapterCount(ILogger logger, int count, string filename);
 }

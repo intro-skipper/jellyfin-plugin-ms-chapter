@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using ChapterCreator.Configuration;
 using ChapterCreator.Managers;
 using MediaBrowser.Model.MediaSegments;
 
@@ -14,9 +15,11 @@ namespace ChapterCreator.SheduledTasks;
 /// Initializes a new instance of the <see cref="BaseChapterTask"/> class.
 /// </remarks>
 /// <param name="chapterOutputService">Chapter output service.</param>
-public class BaseChapterTask(IChapterOutputService chapterOutputService)
+/// <param name="configurationAccessor">Plugin configuration accessor.</param>
+public class BaseChapterTask(IChapterOutputService chapterOutputService, IPluginConfigurationAccessor configurationAccessor) : IChapterTaskRunner
 {
     private readonly IChapterOutputService _chapterOutputService = chapterOutputService;
+    private readonly IPluginConfigurationAccessor _configurationAccessor = configurationAccessor;
 
     /// <summary>
     /// Create chapters for all segments on the server.
@@ -39,7 +42,7 @@ public class BaseChapterTask(IChapterOutputService chapterOutputService)
 
         var totalQueued = sortedSegments.Count;
         var totalProcessed = 0;
-        var maxParallelism = Plugin.Instance!.Configuration.MaxParallelism;
+        var maxParallelism = _configurationAccessor.GetConfiguration().MaxParallelism;
 
         var options = new ParallelOptions
         {

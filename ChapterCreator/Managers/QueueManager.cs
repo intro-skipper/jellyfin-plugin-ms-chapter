@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using ChapterCreator.Configuration;
 using ChapterCreator.Data;
 using Jellyfin.Data.Enums;
 using Jellyfin.Database.Implementations.Enums;
@@ -10,6 +11,7 @@ using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Dto;
+using MediaBrowser.Model.Entities;
 using Microsoft.Extensions.Logging;
 
 namespace ChapterCreator.Managers;
@@ -22,24 +24,33 @@ namespace ChapterCreator.Managers;
 /// </remarks>
 /// <param name="logger">Logger.</param>
 /// <param name="libraryManager">Library manager.</param>
-public partial class QueueManager(ILogger<QueueManager> logger, ILibraryManager libraryManager)
+/// <param name="mediaSourceManager">Media source manager.</param>
+/// <param name="configurationAccessor">Plugin configuration accessor.</param>
+public partial class QueueManager(
+    ILogger<QueueManager> logger,
+    ILibraryManager libraryManager,
+    IMediaSourceManager mediaSourceManager,
+    IPluginConfigurationAccessor configurationAccessor) : IQueueManager
 {
     private readonly ILibraryManager _libraryManager = libraryManager;
     private readonly ILogger<QueueManager> _logger = logger;
+    private readonly IMediaSourceManager _mediaSourceManager = mediaSourceManager;
+    private readonly IPluginConfigurationAccessor _configurationAccessor = configurationAccessor;
     private readonly Dictionary<string, List<int>> _skippedTvShows = [];
-    private readonly Dictionary<Guid, List<QueuedMedia>> _queuedMedia = [];
+    private readonly List<QueuedMedia> _queuedMedia = [];
     private List<string> _selectedLibraries = [];
     private List<string> _skippedMovies = [];
 
     /// <summary>
-    /// Gets all media items on the server.
+    /// Gets the ordered media items selected for analysis.
     /// </summary>
-    /// <returns>Queued media items.</returns>
-    public IReadOnlyDictionary<Guid, List<QueuedMedia>> GetMediaItems()
+    /// <returns>An ordered read-only list of queued media items.</returns>
+    public IReadOnlyList<QueuedMedia> GetMediaItems()
     {
+        _queuedMedia.Clear();
         LoadAnalysisSettings();
 
-        // For all selected libraries, enqueue all contained episodes.
+        // For all selected libraries, enqueue all contained media items.
         foreach (var folder in _libraryManager.GetVirtualFolders())
         {
             // If libraries have been selected for analysis, ensure this library was selected.
@@ -61,7 +72,7 @@ public partial class QueueManager(ILogger<QueueManager> logger, ILibraryManager 
             }
         }
 
-        return new Dictionary<Guid, List<QueuedMedia>>(_queuedMedia);
+        return [.. _queuedMedia];
     }
 
     /// <summary>
@@ -69,7 +80,8 @@ public partial class QueueManager(ILogger<QueueManager> logger, ILibraryManager 
     /// </summary>
     private void LoadAnalysisSettings()
     {
-        var config = Plugin.Instance!.Configuration;
+        var config = _configurationAccessor.GetConfiguration();
+        _skippedTvShows.Clear();
 
         // Get the list of library names which have been selected for analysis, ignoring whitespace and empty entries.
         _selectedLibraries = [.. config.SelectedLibraries.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
@@ -179,7 +191,7 @@ public partial class QueueManager(ILogger<QueueManager> logger, ILibraryManager 
                 }
 
                 // Movie can have multiple MediaSources like 1080p and a 4k file, they have different ids
-                foreach (MediaSourceInfo source in movie.GetMediaSources(false))
+                foreach (var source in _mediaSourceManager.GetStaticMediaSources(movie, false, null))
                 {
                     LogAddingMovie(_logger, movie.Name, source.Name);
                     QueueMovie(movie, source);
@@ -192,7 +204,7 @@ public partial class QueueManager(ILogger<QueueManager> logger, ILibraryManager 
             }
         }
 
-        LogQueuedItemCount(_logger, items.Count);
+        LogQueuedItemCount(_logger, _queuedMedia.Count);
     }
 
     // Test if should skip the episode
@@ -200,7 +212,7 @@ public partial class QueueManager(ILogger<QueueManager> logger, ILibraryManager 
     {
         if (_skippedTvShows.TryGetValue(episode.SeriesName, out var seasons))
         {
-            return episode.AiredSeasonNumber != null && seasons.Contains(episode.AiredSeasonNumber.GetValueOrDefault());
+            return seasons.Count == 0 || (episode.AiredSeasonNumber != null && seasons.Contains(episode.AiredSeasonNumber.GetValueOrDefault()));
         }
 
         return false;
@@ -208,11 +220,6 @@ public partial class QueueManager(ILogger<QueueManager> logger, ILibraryManager 
 
     private void QueueEpisode(Episode episode)
     {
-        if (Plugin.Instance is null)
-        {
-            throw new InvalidOperationException("plugin instance was null");
-        }
-
         if (string.IsNullOrEmpty(episode.Path))
         {
             LogEpisodeNoPath(_logger, episode.Name, episode.SeriesName, episode.Id);
@@ -225,10 +232,7 @@ public partial class QueueManager(ILogger<QueueManager> logger, ILibraryManager 
             return;
         }
 
-        // Allocate a new list for each new season
-        _queuedMedia.TryAdd(episode.SeasonId, new List<QueuedMedia>());
-
-        _queuedMedia[episode.SeasonId].Add(new QueuedMedia()
+        _queuedMedia.Add(new QueuedMedia()
         {
             SeriesName = episode.SeriesName,
             SeasonNumber = episode.AiredSeasonNumber ?? 0,
@@ -240,11 +244,6 @@ public partial class QueueManager(ILogger<QueueManager> logger, ILibraryManager 
 
     private void QueueMovie(Movie movie, MediaSourceInfo source)
     {
-        if (Plugin.Instance is null)
-        {
-            throw new InvalidOperationException("plugin instance was null");
-        }
-
         if (string.IsNullOrEmpty(source.Path))
         {
             LogMovieNoPath(_logger, movie.Name, source.Name, source.Id);
@@ -257,10 +256,7 @@ public partial class QueueManager(ILogger<QueueManager> logger, ILibraryManager 
             return;
         }
 
-        // Allocate a new list for each movie
-        _queuedMedia.TryAdd(Guid.Parse(source.Id), []);
-
-        _queuedMedia[Guid.Parse(source.Id)].Add(new QueuedMedia()
+        _queuedMedia.Add(new QueuedMedia()
         {
             SeriesName = movie.Name,
             SeasonNumber = 0,

@@ -36,9 +36,4 @@ public class QueuedMedia
         /// Gets or sets the name of the media, episode or movie with source quality/name.
         /// </summary>
         public string Name { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Gets or sets the total duration of this media file (in seconds).
-        /// </summary>
-        public int Duration { get; set; }
 }
