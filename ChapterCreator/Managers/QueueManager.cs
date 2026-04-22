@@ -36,10 +36,6 @@ public partial class QueueManager(
     private readonly ILogger<QueueManager> _logger = logger;
     private readonly IMediaSourceManager _mediaSourceManager = mediaSourceManager;
     private readonly IPluginConfigurationAccessor _configurationAccessor = configurationAccessor;
-    private readonly Dictionary<string, List<int>> _skippedTvShows = [];
-    private readonly List<QueuedMedia> _queuedMedia = [];
-    private List<string> _selectedLibraries = [];
-    private List<string> _skippedMovies = [];
 
     /// <summary>
     /// Gets the ordered media items selected for analysis.
@@ -47,14 +43,14 @@ public partial class QueueManager(
     /// <returns>An ordered read-only list of queued media items.</returns>
     public IReadOnlyList<QueuedMedia> GetMediaItems()
     {
-        _queuedMedia.Clear();
-        LoadAnalysisSettings();
+        var queuedMedia = new List<QueuedMedia>();
+        var filters = LoadAnalysisSettings();
 
         // For all selected libraries, enqueue all contained media items.
         foreach (var folder in _libraryManager.GetVirtualFolders())
         {
             // If libraries have been selected for analysis, ensure this library was selected.
-            if (_selectedLibraries.Count > 0 && !_selectedLibraries.Contains(folder.Name))
+            if (filters.SelectedLibraries.Count > 0 && !filters.SelectedLibraries.Contains(folder.Name))
             {
                 LogLibraryNotSelected(_logger, folder.Name);
                 continue;
@@ -64,7 +60,7 @@ public partial class QueueManager(
 
             try
             {
-                QueueLibraryContents(folder.ItemId);
+                QueueLibraryContents(folder.ItemId, queuedMedia, filters);
             }
             catch (Exception ex)
             {
@@ -72,24 +68,28 @@ public partial class QueueManager(
             }
         }
 
-        return [.. _queuedMedia];
+        return queuedMedia;
     }
 
     /// <summary>
     /// Loads the list of libraries which have been selected to use or skipped.
     /// </summary>
-    private void LoadAnalysisSettings()
+    private AnalysisFilters LoadAnalysisSettings()
     {
         var config = _configurationAccessor.GetConfiguration();
-        _skippedTvShows.Clear();
 
         // Get the list of library names which have been selected for analysis, ignoring whitespace and empty entries.
-        _selectedLibraries = [.. config.SelectedLibraries.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+        var selectedLibraries = config.SelectedLibraries
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
 
         // Get the list movie names which should be skipped.
-        _skippedMovies = [.. config.SkippedMovies.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+        var skippedMovies = config.SkippedMovies
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
 
         // Get the list of tvshow names and seasons which should be skipped for analysis.
+        var skippedTvShows = new Dictionary<string, List<int>>();
         var show = config.SkippedTvShows
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .ToList();
@@ -117,26 +117,28 @@ public partial class QueueManager(
                     }
                 }
 
-                _skippedTvShows.Add(name, seasonNumbers);
+                skippedTvShows.Add(name, seasonNumbers);
             }
             else
             {
-                _skippedTvShows.Add(s, []);
+                skippedTvShows.Add(s, []);
             }
         }
 
         // If any libraries have been selected for analysis, log their names.
-        if (_selectedLibraries.Count > 0)
+        if (selectedLibraries.Count > 0)
         {
-            LogSelectedLibraries(_logger, string.Join(", ", _selectedLibraries));
+            LogSelectedLibraries(_logger, string.Join(", ", selectedLibraries));
         }
         else
         {
             LogNoLibraryFilter(_logger);
         }
+
+        return new AnalysisFilters(selectedLibraries, skippedMovies, skippedTvShows);
     }
 
-    private void QueueLibraryContents(string rawId)
+    private void QueueLibraryContents(string rawId, List<QueuedMedia> queuedMedia, AnalysisFilters filters)
     {
         LogConstructingQuery(_logger);
 
@@ -174,17 +176,17 @@ public partial class QueueManager(
         {
             if (item is Episode episode)
             {
-                if (SkipEpisode(episode))
+                if (ShouldSkipEpisode(episode, filters.SkippedTvShows))
                 {
                     LogSkippingEpisode(_logger, episode.Name, episode.SeriesName, episode.AiredSeasonNumber);
                     continue;
                 }
 
-                QueueEpisode(episode);
+                QueueEpisode(episode, queuedMedia);
             }
             else if (item is Movie movie)
             {
-                if (_skippedMovies.Contains(movie.Name))
+                if (filters.SkippedMovies.Contains(movie.Name))
                 {
                     LogSkippingMovie(_logger, movie.Name);
                     continue;
@@ -194,7 +196,7 @@ public partial class QueueManager(
                 foreach (var source in _mediaSourceManager.GetStaticMediaSources(movie, false, null))
                 {
                     LogAddingMovie(_logger, movie.Name, source.Name);
-                    QueueMovie(movie, source);
+                    QueueMovie(movie, source, queuedMedia);
                 }
             }
             else
@@ -204,13 +206,12 @@ public partial class QueueManager(
             }
         }
 
-        LogQueuedItemCount(_logger, _queuedMedia.Count);
+        LogQueuedItemCount(_logger, queuedMedia.Count);
     }
 
-    // Test if should skip the episode
-    private bool SkipEpisode(Episode episode)
+    private static bool ShouldSkipEpisode(Episode episode, Dictionary<string, List<int>> skippedTvShows)
     {
-        if (_skippedTvShows.TryGetValue(episode.SeriesName, out var seasons))
+        if (skippedTvShows.TryGetValue(episode.SeriesName, out var seasons))
         {
             return seasons.Count == 0 || (episode.AiredSeasonNumber != null && seasons.Contains(episode.AiredSeasonNumber.GetValueOrDefault()));
         }
@@ -218,7 +219,7 @@ public partial class QueueManager(
         return false;
     }
 
-    private void QueueEpisode(Episode episode)
+    private void QueueEpisode(Episode episode, List<QueuedMedia> queuedMedia)
     {
         if (string.IsNullOrEmpty(episode.Path))
         {
@@ -232,7 +233,7 @@ public partial class QueueManager(
             return;
         }
 
-        _queuedMedia.Add(new QueuedMedia()
+        queuedMedia.Add(new QueuedMedia()
         {
             SeriesName = episode.SeriesName,
             SeasonNumber = episode.AiredSeasonNumber ?? 0,
@@ -242,7 +243,7 @@ public partial class QueueManager(
         });
     }
 
-    private void QueueMovie(Movie movie, MediaSourceInfo source)
+    private void QueueMovie(Movie movie, MediaSourceInfo source, List<QueuedMedia> queuedMedia)
     {
         if (string.IsNullOrEmpty(source.Path))
         {
@@ -256,7 +257,7 @@ public partial class QueueManager(
             return;
         }
 
-        _queuedMedia.Add(new QueuedMedia()
+        queuedMedia.Add(new QueuedMedia()
         {
             SeriesName = movie.Name,
             SeasonNumber = 0,
@@ -324,4 +325,12 @@ public partial class QueueManager(
 
     [LoggerMessage(EventId = 1218, Level = LogLevel.Warning, Message = "Not queuing movie '{Name} ({Source})' ({Id}) as no duration was provided by Jellyfin")]
     private static partial void LogMovieNoDuration(ILogger logger, string name, string source, string id);
+
+    /// <summary>
+    /// Holds the parsed analysis filter settings for a single <see cref="GetMediaItems"/> invocation.
+    /// </summary>
+    private sealed record AnalysisFilters(
+        List<string> SelectedLibraries,
+        List<string> SkippedMovies,
+        Dictionary<string, List<int>> SkippedTvShows);
 }
