@@ -11,7 +11,6 @@ using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Dto;
-using MediaBrowser.Model.Entities;
 using Microsoft.Extensions.Logging;
 
 namespace ChapterCreator.Managers;
@@ -89,7 +88,7 @@ public partial class QueueManager(
             .ToList();
 
         // Get the list of tvshow names and seasons which should be skipped for analysis.
-        var skippedTvShows = new Dictionary<string, List<int>>();
+        var skippedTvShows = new Dictionary<string, IReadOnlyList<int>>();
         var show = config.SkippedTvShows
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .ToList();
@@ -209,7 +208,7 @@ public partial class QueueManager(
         LogQueuedItemCount(_logger, queuedMedia.Count);
     }
 
-    private static bool ShouldSkipEpisode(Episode episode, Dictionary<string, List<int>> skippedTvShows)
+    private static bool ShouldSkipEpisode(Episode episode, IReadOnlyDictionary<string, IReadOnlyList<int>> skippedTvShows)
     {
         if (skippedTvShows.TryGetValue(episode.SeriesName, out var seasons))
         {
@@ -325,12 +324,4 @@ public partial class QueueManager(
 
     [LoggerMessage(EventId = 1218, Level = LogLevel.Warning, Message = "Not queuing movie '{Name} ({Source})' ({Id}) as no duration was provided by Jellyfin")]
     private static partial void LogMovieNoDuration(ILogger logger, string name, string source, string id);
-
-    /// <summary>
-    /// Holds the parsed analysis filter settings for a single <see cref="GetMediaItems"/> invocation.
-    /// </summary>
-    private sealed record AnalysisFilters(
-        List<string> SelectedLibraries,
-        List<string> SkippedMovies,
-        Dictionary<string, List<int>> SkippedTvShows);
 }
