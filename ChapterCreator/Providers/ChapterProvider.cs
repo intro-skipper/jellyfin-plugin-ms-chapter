@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,27 +11,33 @@ using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.MediaSegments;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace ChapterCreator.Providers;
 
 /// <summary>
-/// Class ChapterProvider. Provides chapter information
-/// for media items during library scans.
+/// Provides chapter information for media items during library scans.
 /// </summary>
 /// <remarks>
 /// Initializes a new instance of the <see cref="ChapterProvider"/> class.
 /// </remarks>
 /// <param name="chapterOutputService">The chapter output service.</param>
 /// <param name="mediaSegmentManager">The media segment manager.</param>
-public class ChapterProvider(
+/// <param name="logger">The logger instance.</param>
+/// <param name="configurationAccessor">The plugin configuration accessor.</param>
+public partial class ChapterProvider(
     IChapterOutputService chapterOutputService,
-    IMediaSegmentManager mediaSegmentManager) : ICustomMetadataProvider<Episode>,
+    IMediaSegmentManager mediaSegmentManager,
+    ILogger<ChapterProvider> logger,
+    IPluginConfigurationAccessor configurationAccessor) : ICustomMetadataProvider<Episode>,
     ICustomMetadataProvider<Movie>,
     IHasItemChangeMonitor,
     IHasOrder
 {
     private readonly IChapterOutputService _chapterOutputService = chapterOutputService;
     private readonly IMediaSegmentManager _mediaSegmentManager = mediaSegmentManager;
+    private readonly ILogger<ChapterProvider> _logger = logger;
+    private readonly IPluginConfigurationAccessor _configurationAccessor = configurationAccessor;
 
     /// <inheritdoc />
     public string Name => "Chapter Provider";
@@ -41,13 +48,15 @@ public class ChapterProvider(
     /// <inheritdoc />
     public bool HasChanged(BaseItem item, IDirectoryService directoryService)
     {
-        if (item.IsFileProtocol)
+        if (!item.IsFileProtocol || string.IsNullOrWhiteSpace(item.Path))
         {
-            var file = directoryService.GetFile(item.Path);
-            if (file is not null && item.HasChanged(file.LastWriteTimeUtc))
-            {
-                return true;
-            }
+            return false;
+        }
+
+        var file = directoryService.GetFile(item.Path);
+        if (file is not null && file.LastWriteTimeUtc > item.DateLastSaved)
+        {
+            return true;
         }
 
         return false;
@@ -67,12 +76,7 @@ public class ChapterProvider(
 
     private async Task<ItemUpdateType> FetchInternal(Video video, MetadataRefreshOptions options, CancellationToken cancellationToken)
     {
-        var config = Plugin.Instance?.Configuration ?? new PluginConfiguration();
-        if (!config.AutoRefresh)
-        {
-            return ItemUpdateType.None;
-        }
-
+        var config = _configurationAccessor.GetConfiguration();
         var segmentsList = await _mediaSegmentManager.GetSegmentsAsync(
             video,
             null,
@@ -81,15 +85,43 @@ public class ChapterProvider(
 
         if (!segmentsList.Any())
         {
-            // No segments found — try importing from existing XML file
-            await _chapterOutputService.ImportFromXmlAsync(video.Id, cancellationToken).ConfigureAwait(false);
+            if (config.ImportXmlChapters)
+            {
+                try
+                {
+                    await _chapterOutputService.ImportFromXmlAsync(video.Id, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    LogXmlImportFailure(_logger, video.Id, video.Name, ex);
+                }
+            }
+
+            return ItemUpdateType.None;
+        }
+
+        if (!config.AutoRefresh)
+        {
             return ItemUpdateType.None;
         }
 
         var sortedSegments = segmentsList.SortForItem(video.Id);
 
-        await _chapterOutputService.ProcessChaptersAsync(sortedSegments, false, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await _chapterOutputService.ProcessChaptersAsync(sortedSegments, false, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            LogProcessChaptersFailure(_logger, video.Id, video.Name, ex);
+        }
 
         return ItemUpdateType.None;
     }
+
+    [LoggerMessage(EventId = 1000, Level = LogLevel.Error, Message = "Failed to import XML chapters for item {Id} ({Name}), skipping")]
+    private static partial void LogXmlImportFailure(ILogger logger, Guid id, string? name, Exception ex);
+
+    [LoggerMessage(EventId = 1001, Level = LogLevel.Error, Message = "Failed to process chapters for item {Id} ({Name}), skipping")]
+    private static partial void LogProcessChaptersFailure(ILogger logger, Guid id, string? name, Exception ex);
 }

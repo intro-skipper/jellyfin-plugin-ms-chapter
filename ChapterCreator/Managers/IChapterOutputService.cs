@@ -25,7 +25,7 @@ public interface IChapterOutputService
     /// <param name="segments">Key value pair of item ID to its media segments.</param>
     /// <param name="forceOverwrite">Force overwrite of existing chapter data.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A <see cref="ValueTask"/> representing the synchronous operation.</returns>
+    /// <returns>A <see cref="ValueTask"/> representing the asynchronous operation.</returns>
     ValueTask ProcessChaptersAsync(
         KeyValuePair<Guid, List<MediaSegmentDto>> segments,
         bool forceOverwrite,
@@ -37,6 +37,15 @@ public interface IChapterOutputService
     /// </summary>
     /// <param name="itemId">The media item ID.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A <see cref="ValueTask"/> representing the synchronous operation.</returns>
+    /// <returns>A <see cref="ValueTask"/> representing the asynchronous operation.</returns>
     ValueTask ImportFromXmlAsync(Guid itemId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Clears existing chapter output for a media item.
+    /// Removes generated XML, injected Jellyfin chapters, or both, based on configuration.
+    /// </summary>
+    /// <param name="itemId">The media item ID.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A <see cref="ValueTask"/> representing the asynchronous operation.</returns>
+    ValueTask ClearChaptersAsync(Guid itemId, CancellationToken cancellationToken);
 }

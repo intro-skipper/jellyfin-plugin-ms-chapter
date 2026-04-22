@@ -6,6 +6,7 @@ using System.Net.Mime;
 using System.Threading;
 using System.Threading.Tasks;
 using ChapterCreator.Managers;
+using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.MediaSegments;
 using MediaBrowser.Model.Configuration;
 using MediaBrowser.Model.MediaSegments;
@@ -24,6 +25,7 @@ namespace ChapterCreator.Controllers;
 /// <param name="mediaSegmentManager">MediaSegmentsManager.</param>
 /// <param name="chapterFileManager">ChapterFileManager.</param>
 /// <param name="chapterOutputService">ChapterOutputService.</param>
+/// <param name="libraryManager">Library manager.</param>
 [Authorize(Policy = "RequiresElevation")]
 [ApiController]
 [Produces(MediaTypeNames.Application.Json)]
@@ -31,11 +33,13 @@ namespace ChapterCreator.Controllers;
 public class ChapterController(
     IMediaSegmentManager mediaSegmentManager,
     IChapterFileManager chapterFileManager,
-    IChapterOutputService chapterOutputService) : ControllerBase
+    IChapterOutputService chapterOutputService,
+    ILibraryManager libraryManager) : ControllerBase
 {
     private readonly IMediaSegmentManager _mediaSegmentManager = mediaSegmentManager;
     private readonly IChapterFileManager _chapterFileManager = chapterFileManager;
     private readonly IChapterOutputService _chapterOutputService = chapterOutputService;
+    private readonly ILibraryManager _libraryManager = libraryManager;
 
     /// <summary>
     /// Plugin meta endpoint.
@@ -47,7 +51,7 @@ public class ChapterController(
     {
         var json = new
         {
-            version = Plugin.Instance!.Version.ToString(3),
+            version = typeof(Plugin).Assembly.GetName().Version?.ToString(3) ?? "0.0.0",
         };
 
         return new JsonResult(json);
@@ -64,7 +68,7 @@ public class ChapterController(
         [FromRoute, Required] Guid itemId)
     {
         var segmentsList = new List<MediaSegmentDto>();
-        var item = Plugin.Instance!.GetItem(itemId) ?? throw new ArgumentNullException(nameof(itemId), "Item not found");
+        var item = _libraryManager.GetItemById(itemId) ?? throw new ArgumentNullException(nameof(itemId), "Item not found");
         segmentsList.AddRange(await _mediaSegmentManager.GetSegmentsAsync(item, null, new LibraryOptions(), true).ConfigureAwait(false));
 
         var rawstring = _chapterFileManager.ToChapter(itemId, segmentsList);
@@ -95,27 +99,7 @@ public class ChapterController(
             throw new ArgumentNullException(nameof(itemIds));
         }
 
-        var segmentsList = new List<MediaSegmentDto>();
-
-        foreach (var id in itemIds)
-        {
-            var item = Plugin.Instance!.GetItem(id);
-            if (item is null)
-            {
-                continue;
-            }
-
-            segmentsList.AddRange(await _mediaSegmentManager.GetSegmentsAsync(item, null, new LibraryOptions(), true).ConfigureAwait(false));
-        }
-
-        // Group segments by ItemId and sort by StartTicks
-        var sortedSegments = segmentsList.GroupAndSortByItem();
-
-        foreach (var segment in sortedSegments)
-        {
-            await _chapterOutputService.ProcessChaptersAsync(segment, true, cancellationToken).ConfigureAwait(false);
-        }
-
+        await ProcessItemsAsync(itemIds, cancellationToken).ConfigureAwait(false);
         return new OkResult();
     }
 
@@ -137,9 +121,15 @@ public class ChapterController(
             throw new ArgumentNullException(nameof(itemIds));
         }
 
+        await ProcessItemsAsync(itemIds, cancellationToken).ConfigureAwait(false);
+        return new OkResult();
+    }
+
+    private async Task ProcessItemsAsync(Guid[] itemIds, CancellationToken cancellationToken)
+    {
         foreach (var id in itemIds)
         {
-            var item = Plugin.Instance!.GetItem(id);
+            var item = _libraryManager.GetItemById(id);
             if (item is null)
             {
                 continue;
@@ -150,6 +140,7 @@ public class ChapterController(
 
             if (!segmentsList.Any())
             {
+                await _chapterOutputService.ClearChaptersAsync(id, cancellationToken).ConfigureAwait(false);
                 continue;
             }
 
@@ -158,7 +149,5 @@ public class ChapterController(
             await _chapterOutputService.ProcessChaptersAsync(sortedSegments, true, cancellationToken)
                 .ConfigureAwait(false);
         }
-
-        return new OkResult();
     }
 }
