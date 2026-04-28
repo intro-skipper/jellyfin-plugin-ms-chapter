@@ -58,6 +58,122 @@ public class ChapterControllerTests
     }
 
     [Fact]
+    public async Task RefreshChapterData_WhenGetSegmentsFailsForItem_ProcessesNextItem()
+    {
+        var failingItemId = Guid.NewGuid();
+        var nextItemId = Guid.NewGuid();
+        var failingItem = new Movie { Id = failingItemId, Path = @"C:\media\failing.mkv" };
+        var nextItem = new Movie { Id = nextItemId, Path = @"C:\media\next.mkv" };
+        var failure = new InvalidOperationException("segments failed");
+
+        var mediaSegmentManager = new Mock<IMediaSegmentManager>(MockBehavior.Strict);
+        mediaSegmentManager
+            .Setup(manager => manager.GetSegmentsAsync(failingItem, null, It.IsAny<LibraryOptions>(), true))
+            .ThrowsAsync(failure);
+        mediaSegmentManager
+            .Setup(manager => manager.GetSegmentsAsync(nextItem, null, It.IsAny<LibraryOptions>(), true))
+            .ReturnsAsync(CreateSegments(nextItemId));
+
+        var chapterFileManager = new Mock<IChapterFileManager>(MockBehavior.Strict);
+        var chapterOutputService = new Mock<IChapterOutputService>(MockBehavior.Strict);
+        chapterOutputService
+            .Setup(service => service.ProcessChaptersAsync(
+                It.Is<KeyValuePair<Guid, List<MediaSegmentDto>>>(segments => segments.Key == nextItemId && segments.Value.Count == 2),
+                true,
+                It.IsAny<CancellationToken>()))
+            .Returns(ValueTask.CompletedTask);
+
+        var libraryManager = new Mock<ILibraryManager>(MockBehavior.Strict);
+        libraryManager
+            .Setup(manager => manager.GetItemById(failingItemId))
+            .Returns(failingItem);
+        libraryManager
+            .Setup(manager => manager.GetItemById(nextItemId))
+            .Returns(nextItem);
+        var logger = new ListLogger<ChapterController>();
+
+        var sut = new ChapterController(
+            mediaSegmentManager.Object,
+            chapterFileManager.Object,
+            chapterOutputService.Object,
+            libraryManager.Object,
+            logger);
+
+        await sut.RefreshChapterData([failingItemId, nextItemId], CancellationToken.None);
+
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.LogLevel == LogLevel.Error &&
+                entry.Message.Contains("Failed to retrieve media segments", StringComparison.Ordinal) &&
+                entry.Message.Contains(failingItemId.ToString(), StringComparison.Ordinal) &&
+                ReferenceEquals(entry.Exception, failure));
+        libraryManager.Verify(manager => manager.GetItemById(failingItemId), Times.Once);
+        libraryManager.Verify(manager => manager.GetItemById(nextItemId), Times.Once);
+        mediaSegmentManager.Verify(manager => manager.GetSegmentsAsync(failingItem, null, It.IsAny<LibraryOptions>(), true), Times.Once);
+        mediaSegmentManager.Verify(manager => manager.GetSegmentsAsync(nextItem, null, It.IsAny<LibraryOptions>(), true), Times.Once);
+        chapterOutputService.Verify(service => service.ClearChaptersAsync(failingItemId, It.IsAny<CancellationToken>()), Times.Never);
+        chapterOutputService.Verify(service => service.ProcessChaptersAsync(
+            It.Is<KeyValuePair<Guid, List<MediaSegmentDto>>>(segments => segments.Key == failingItemId),
+            true,
+            It.IsAny<CancellationToken>()), Times.Never);
+        chapterOutputService.Verify(service => service.ProcessChaptersAsync(
+            It.Is<KeyValuePair<Guid, List<MediaSegmentDto>>>(segments => segments.Key == nextItemId && segments.Value.Count == 2),
+            true,
+            It.IsAny<CancellationToken>()), Times.Once);
+        chapterFileManager.VerifyNoOtherCalls();
+        chapterOutputService.VerifyNoOtherCalls();
+        mediaSegmentManager.VerifyNoOtherCalls();
+        libraryManager.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task RefreshChapterData_WhenGetSegmentsIsCanceled_ThrowsAndDoesNotProcessNextItem()
+    {
+        var failingItemId = Guid.NewGuid();
+        var nextItemId = Guid.NewGuid();
+        var failingItem = new Movie { Id = failingItemId, Path = @"C:\media\failing.mkv" };
+        var nextItem = new Movie { Id = nextItemId, Path = @"C:\media\next.mkv" };
+        var cancellation = new OperationCanceledException("segments canceled");
+
+        var mediaSegmentManager = new Mock<IMediaSegmentManager>(MockBehavior.Strict);
+        mediaSegmentManager
+            .Setup(manager => manager.GetSegmentsAsync(failingItem, null, It.IsAny<LibraryOptions>(), true))
+            .ThrowsAsync(cancellation);
+
+        var chapterFileManager = new Mock<IChapterFileManager>(MockBehavior.Strict);
+        var chapterOutputService = new Mock<IChapterOutputService>(MockBehavior.Strict);
+
+        var libraryManager = new Mock<ILibraryManager>(MockBehavior.Strict);
+        libraryManager
+            .Setup(manager => manager.GetItemById(failingItemId))
+            .Returns(failingItem);
+        libraryManager
+            .Setup(manager => manager.GetItemById(nextItemId))
+            .Returns(nextItem);
+        var logger = new ListLogger<ChapterController>();
+
+        var sut = new ChapterController(
+            mediaSegmentManager.Object,
+            chapterFileManager.Object,
+            chapterOutputService.Object,
+            libraryManager.Object,
+            logger);
+
+        var thrown = await Assert.ThrowsAsync<OperationCanceledException>(
+            () => sut.RefreshChapterData([failingItemId, nextItemId], CancellationToken.None));
+
+        Assert.Same(cancellation, thrown);
+        Assert.Empty(logger.Entries);
+        libraryManager.Verify(manager => manager.GetItemById(failingItemId), Times.Once);
+        libraryManager.Verify(manager => manager.GetItemById(nextItemId), Times.Never);
+        mediaSegmentManager.Verify(manager => manager.GetSegmentsAsync(failingItem, null, It.IsAny<LibraryOptions>(), true), Times.Once);
+        chapterFileManager.VerifyNoOtherCalls();
+        chapterOutputService.VerifyNoOtherCalls();
+        mediaSegmentManager.VerifyNoOtherCalls();
+        libraryManager.VerifyNoOtherCalls();
+    }
+
+    [Fact]
     public async Task RefreshChapterData_WhenClearChaptersFailsForItem_ProcessesNextItem()
     {
         var failingItemId = Guid.NewGuid();

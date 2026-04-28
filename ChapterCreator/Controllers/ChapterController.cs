@@ -139,8 +139,17 @@ public partial class ChapterController(
                 continue;
             }
 
-            var segmentsList = await _mediaSegmentManager.GetSegmentsAsync(
-                item, null, new LibraryOptions(), true).ConfigureAwait(false);
+            IEnumerable<MediaSegmentDto> segmentsList;
+            try
+            {
+                segmentsList = await _mediaSegmentManager.GetSegmentsAsync(
+                    item, null, new LibraryOptions(), true).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                LogRetrieveMediaSegmentsFailure(_logger, id, ex);
+                continue;
+            }
 
             if (!segmentsList.Any())
             {
@@ -175,4 +184,7 @@ public partial class ChapterController(
 
     [LoggerMessage(EventId = 1001, Level = LogLevel.Error, Message = "Failed to process chapters for item {Id}, skipping")]
     private static partial void LogProcessChaptersFailure(ILogger logger, Guid id, Exception ex);
+
+    [LoggerMessage(EventId = 1002, Level = LogLevel.Error, Message = "Failed to retrieve media segments for item {Id}, skipping")]
+    private static partial void LogRetrieveMediaSegmentsFailure(ILogger logger, Guid id, Exception ex);
 }
