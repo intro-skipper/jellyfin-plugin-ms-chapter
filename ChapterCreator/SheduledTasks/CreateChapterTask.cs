@@ -9,6 +9,7 @@ using MediaBrowser.Controller.MediaSegments;
 using MediaBrowser.Model.Configuration;
 using MediaBrowser.Model.MediaSegments;
 using MediaBrowser.Model.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace ChapterCreator.SheduledTasks;
 
@@ -23,18 +24,21 @@ namespace ChapterCreator.SheduledTasks;
 /// <param name="legacyChapterMigrator">Legacy chapter migrator.</param>
 /// <param name="queueManager">Queue manager.</param>
 /// <param name="chapterTaskRunner">Chapter task runner.</param>
-public class CreateChapterTask(
+/// <param name="logger">Logger.</param>
+public partial class CreateChapterTask(
     ILibraryManager libraryManager,
     IMediaSegmentManager mediaSegmentManager,
     ILegacyChapterMigrator legacyChapterMigrator,
     IQueueManager queueManager,
-    IChapterTaskRunner chapterTaskRunner) : IScheduledTask
+    IChapterTaskRunner chapterTaskRunner,
+    ILogger<CreateChapterTask> logger) : IScheduledTask
 {
     private readonly ILibraryManager _libraryManager = libraryManager;
     private readonly IMediaSegmentManager _mediaSegmentManager = mediaSegmentManager;
     private readonly ILegacyChapterMigrator _legacyChapterMigrator = legacyChapterMigrator;
     private readonly IQueueManager _queueManager = queueManager;
     private readonly IChapterTaskRunner _chapterTaskRunner = chapterTaskRunner;
+    private readonly ILogger<CreateChapterTask> _logger = logger;
 
     /// <summary>
     /// Gets the task name.
@@ -76,7 +80,19 @@ public class CreateChapterTask(
                 continue;
             }
 
-            segmentsList.AddRange(await _mediaSegmentManager.GetSegmentsAsync(item, null, new LibraryOptions(), true).ConfigureAwait(false));
+            IEnumerable<MediaSegmentDto> itemSegments;
+            try
+            {
+                itemSegments = await _mediaSegmentManager.GetSegmentsAsync(
+                    item, null, new LibraryOptions(), true).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                LogRetrieveMediaSegmentsFailure(_logger, media.ItemId, ex);
+                continue;
+            }
+
+            segmentsList.AddRange(itemSegments);
         }
 
         if (segmentsList.Count > 0)
@@ -93,4 +109,7 @@ public class CreateChapterTask(
     {
         return [];
     }
+
+    [LoggerMessage(EventId = 1000, Level = LogLevel.Error, Message = "Failed to retrieve media segments for item {Id}, skipping")]
+    private static partial void LogRetrieveMediaSegmentsFailure(ILogger logger, Guid id, Exception ex);
 }

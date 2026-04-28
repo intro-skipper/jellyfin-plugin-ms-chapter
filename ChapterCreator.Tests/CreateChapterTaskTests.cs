@@ -12,6 +12,8 @@ using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.MediaSegments;
 using MediaBrowser.Model.Configuration;
 using MediaBrowser.Model.MediaSegments;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
 
@@ -71,7 +73,8 @@ public class CreateChapterTaskTests
             mediaSegmentManager.Object,
             legacyChapterMigrator.Object,
             queueManager.Object,
-            chapterTaskRunner.Object);
+            chapterTaskRunner.Object,
+            NullLogger<CreateChapterTask>.Instance);
 
         await sut.ExecuteAsync(Mock.Of<IProgress<double>>(), CancellationToken.None);
 
@@ -90,6 +93,142 @@ public class CreateChapterTaskTests
         chapterTaskRunner.Verify(runner => runner.CreateChaptersAsync(It.IsAny<IProgress<double>>(), It.IsAny<IReadOnlyCollection<MediaSegmentDto>>(), false, It.IsAny<CancellationToken>()), Times.Once);
         mediaSegmentManager.Verify(manager => manager.GetSegmentsAsync(firstItem, null, It.IsAny<LibraryOptions>(), true), Times.Once);
         mediaSegmentManager.Verify(manager => manager.GetSegmentsAsync(secondItem, null, It.IsAny<LibraryOptions>(), true), Times.Once);
+        libraryManager.VerifyNoOtherCalls();
+        queueManager.VerifyNoOtherCalls();
+        chapterTaskRunner.VerifyNoOtherCalls();
+        legacyChapterMigrator.VerifyNoOtherCalls();
+        mediaSegmentManager.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenGetSegmentsFailsForQueuedItem_ProcessesNextItem()
+    {
+        var failingItemId = Guid.NewGuid();
+        var nextItemId = Guid.NewGuid();
+        var queuedMedia = new[]
+        {
+            new QueuedMedia { SeriesName = "Series A", SeasonNumber = 1, ItemId = failingItemId, Name = "Failing Episode", Path = @"C:\media\failing.mkv", IsEpisode = true },
+            new QueuedMedia { SeriesName = "Series A", SeasonNumber = 1, ItemId = nextItemId, Name = "Episode 2", Path = @"C:\media\next.mkv", IsEpisode = true }
+        };
+        var failingItem = new Movie { Id = failingItemId, Path = queuedMedia[0].Path, Name = queuedMedia[0].Name };
+        var nextItem = new Movie { Id = nextItemId, Path = queuedMedia[1].Path, Name = queuedMedia[1].Name };
+        var failure = new InvalidOperationException("segments failed");
+        var nextSegments = new List<MediaSegmentDto>
+        {
+            new() { ItemId = nextItemId, StartTicks = 10, EndTicks = 20 },
+            new() { ItemId = nextItemId, StartTicks = 30, EndTicks = 40 }
+        };
+
+        var mediaSegmentManager = new Mock<IMediaSegmentManager>(MockBehavior.Strict);
+        mediaSegmentManager
+            .Setup(manager => manager.GetSegmentsAsync(failingItem, null, It.Is<LibraryOptions>(options => options.GetType() == typeof(LibraryOptions)), true))
+            .ThrowsAsync(failure);
+        mediaSegmentManager
+            .Setup(manager => manager.GetSegmentsAsync(nextItem, null, It.Is<LibraryOptions>(options => options.GetType() == typeof(LibraryOptions)), true))
+            .ReturnsAsync(nextSegments);
+
+        var libraryManager = new Mock<ILibraryManager>(MockBehavior.Strict);
+        libraryManager.Setup(manager => manager.GetItemById(failingItemId)).Returns(failingItem);
+        libraryManager.Setup(manager => manager.GetItemById(nextItemId)).Returns(nextItem);
+
+        var queueManager = new Mock<IQueueManager>(MockBehavior.Strict);
+        queueManager.Setup(manager => manager.GetMediaItems()).Returns(queuedMedia);
+
+        var chapterTaskRunner = new Mock<IChapterTaskRunner>(MockBehavior.Strict);
+        IReadOnlyCollection<MediaSegmentDto>? createdSegments = null;
+        chapterTaskRunner
+            .Setup(runner => runner.CreateChaptersAsync(It.IsAny<IProgress<double>>(), It.IsAny<IReadOnlyCollection<MediaSegmentDto>>(), false, It.IsAny<CancellationToken>()))
+            .Callback<IProgress<double>, IReadOnlyCollection<MediaSegmentDto>, bool, CancellationToken>((_, segments, _, _) => createdSegments = segments)
+            .Returns(Task.CompletedTask);
+
+        var legacyChapterMigrator = new Mock<ILegacyChapterMigrator>(MockBehavior.Strict);
+        legacyChapterMigrator.Setup(migrator => migrator.MigrateIfNeeded());
+        var logger = new ListLogger<CreateChapterTask>();
+
+        var sut = new CreateChapterTask(
+            libraryManager.Object,
+            mediaSegmentManager.Object,
+            legacyChapterMigrator.Object,
+            queueManager.Object,
+            chapterTaskRunner.Object,
+            logger);
+
+        await sut.ExecuteAsync(Mock.Of<IProgress<double>>(), CancellationToken.None);
+
+        Assert.NotNull(createdSegments);
+        Assert.Equal(nextSegments, createdSegments);
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.LogLevel == LogLevel.Error &&
+                entry.Message.Contains("Failed to retrieve media segments", StringComparison.Ordinal) &&
+                entry.Message.Contains(failingItemId.ToString(), StringComparison.Ordinal) &&
+                ReferenceEquals(entry.Exception, failure));
+        legacyChapterMigrator.Verify(migrator => migrator.MigrateIfNeeded(), Times.Once);
+        queueManager.Verify(manager => manager.GetMediaItems(), Times.Once);
+        libraryManager.Verify(manager => manager.GetItemById(failingItemId), Times.Once);
+        libraryManager.Verify(manager => manager.GetItemById(nextItemId), Times.Once);
+        chapterTaskRunner.Verify(runner => runner.CreateChaptersAsync(It.IsAny<IProgress<double>>(), It.IsAny<IReadOnlyCollection<MediaSegmentDto>>(), false, It.IsAny<CancellationToken>()), Times.Once);
+        mediaSegmentManager.Verify(manager => manager.GetSegmentsAsync(failingItem, null, It.IsAny<LibraryOptions>(), true), Times.Once);
+        mediaSegmentManager.Verify(manager => manager.GetSegmentsAsync(nextItem, null, It.IsAny<LibraryOptions>(), true), Times.Once);
+        libraryManager.VerifyNoOtherCalls();
+        queueManager.VerifyNoOtherCalls();
+        chapterTaskRunner.VerifyNoOtherCalls();
+        legacyChapterMigrator.VerifyNoOtherCalls();
+        mediaSegmentManager.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenGetSegmentsIsCanceled_ThrowsAndDoesNotProcessNextItem()
+    {
+        var failingItemId = Guid.NewGuid();
+        var nextItemId = Guid.NewGuid();
+        var queuedMedia = new[]
+        {
+            new QueuedMedia { SeriesName = "Series A", SeasonNumber = 1, ItemId = failingItemId, Name = "Canceling Episode", Path = @"C:\media\canceling.mkv", IsEpisode = true },
+            new QueuedMedia { SeriesName = "Series A", SeasonNumber = 1, ItemId = nextItemId, Name = "Episode 2", Path = @"C:\media\next.mkv", IsEpisode = true }
+        };
+        var failingItem = new Movie { Id = failingItemId, Path = queuedMedia[0].Path, Name = queuedMedia[0].Name };
+        var nextItem = new Movie { Id = nextItemId, Path = queuedMedia[1].Path, Name = queuedMedia[1].Name };
+        var cancellation = new OperationCanceledException("segments canceled");
+
+        var mediaSegmentManager = new Mock<IMediaSegmentManager>(MockBehavior.Strict);
+        mediaSegmentManager
+            .Setup(manager => manager.GetSegmentsAsync(failingItem, null, It.Is<LibraryOptions>(options => options.GetType() == typeof(LibraryOptions)), true))
+            .ThrowsAsync(cancellation);
+
+        var libraryManager = new Mock<ILibraryManager>(MockBehavior.Strict);
+        libraryManager.Setup(manager => manager.GetItemById(failingItemId)).Returns(failingItem);
+        libraryManager.Setup(manager => manager.GetItemById(nextItemId)).Returns(nextItem);
+
+        var queueManager = new Mock<IQueueManager>(MockBehavior.Strict);
+        queueManager.Setup(manager => manager.GetMediaItems()).Returns(queuedMedia);
+
+        var chapterTaskRunner = new Mock<IChapterTaskRunner>(MockBehavior.Strict);
+
+        var legacyChapterMigrator = new Mock<ILegacyChapterMigrator>(MockBehavior.Strict);
+        legacyChapterMigrator.Setup(migrator => migrator.MigrateIfNeeded());
+        var logger = new ListLogger<CreateChapterTask>();
+
+        var sut = new CreateChapterTask(
+            libraryManager.Object,
+            mediaSegmentManager.Object,
+            legacyChapterMigrator.Object,
+            queueManager.Object,
+            chapterTaskRunner.Object,
+            logger);
+
+        var thrown = await Assert.ThrowsAsync<OperationCanceledException>(
+            () => sut.ExecuteAsync(Mock.Of<IProgress<double>>(), CancellationToken.None));
+
+        Assert.Same(cancellation, thrown);
+        Assert.Empty(logger.Entries);
+        legacyChapterMigrator.Verify(migrator => migrator.MigrateIfNeeded(), Times.Once);
+        queueManager.Verify(manager => manager.GetMediaItems(), Times.Once);
+        libraryManager.Verify(manager => manager.GetItemById(failingItemId), Times.Once);
+        libraryManager.Verify(manager => manager.GetItemById(nextItemId), Times.Never);
+        chapterTaskRunner.Verify(runner => runner.CreateChaptersAsync(It.IsAny<IProgress<double>>(), It.IsAny<IReadOnlyCollection<MediaSegmentDto>>(), false, It.IsAny<CancellationToken>()), Times.Never);
+        mediaSegmentManager.Verify(manager => manager.GetSegmentsAsync(failingItem, null, It.IsAny<LibraryOptions>(), true), Times.Once);
+        mediaSegmentManager.Verify(manager => manager.GetSegmentsAsync(nextItem, null, It.IsAny<LibraryOptions>(), true), Times.Never);
         libraryManager.VerifyNoOtherCalls();
         queueManager.VerifyNoOtherCalls();
         chapterTaskRunner.VerifyNoOtherCalls();
@@ -140,7 +279,8 @@ public class CreateChapterTaskTests
             mediaSegmentManager.Object,
             legacyChapterMigrator.Object,
             queueManager.Object,
-            chapterTaskRunner.Object);
+            chapterTaskRunner.Object,
+            NullLogger<CreateChapterTask>.Instance);
 
         await sut.ExecuteAsync(Mock.Of<IProgress<double>>(), CancellationToken.None);
 
@@ -191,7 +331,8 @@ public class CreateChapterTaskTests
             mediaSegmentManager.Object,
             legacyChapterMigrator.Object,
             queueManager.Object,
-            chapterTaskRunner.Object);
+            chapterTaskRunner.Object,
+            NullLogger<CreateChapterTask>.Instance);
 
         await sut.ExecuteAsync(Mock.Of<IProgress<double>>(), CancellationToken.None);
 
