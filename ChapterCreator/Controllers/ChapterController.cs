@@ -13,6 +13,7 @@ using MediaBrowser.Model.MediaSegments;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace ChapterCreator.Controllers;
 
@@ -26,20 +27,23 @@ namespace ChapterCreator.Controllers;
 /// <param name="chapterFileManager">ChapterFileManager.</param>
 /// <param name="chapterOutputService">ChapterOutputService.</param>
 /// <param name="libraryManager">Library manager.</param>
+/// <param name="logger">Logger.</param>
 [Authorize(Policy = "RequiresElevation")]
 [ApiController]
 [Produces(MediaTypeNames.Application.Json)]
 [Route("PluginChapter")]
-public class ChapterController(
+public partial class ChapterController(
     IMediaSegmentManager mediaSegmentManager,
     IChapterFileManager chapterFileManager,
     IChapterOutputService chapterOutputService,
-    ILibraryManager libraryManager) : ControllerBase
+    ILibraryManager libraryManager,
+    ILogger<ChapterController> logger) : ControllerBase
 {
     private readonly IMediaSegmentManager _mediaSegmentManager = mediaSegmentManager;
     private readonly IChapterFileManager _chapterFileManager = chapterFileManager;
     private readonly IChapterOutputService _chapterOutputService = chapterOutputService;
     private readonly ILibraryManager _libraryManager = libraryManager;
+    private readonly ILogger<ChapterController> _logger = logger;
 
     /// <summary>
     /// Plugin meta endpoint.
@@ -140,14 +144,35 @@ public class ChapterController(
 
             if (!segmentsList.Any())
             {
-                await _chapterOutputService.ClearChaptersAsync(id, cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    await _chapterOutputService.ClearChaptersAsync(id, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    LogClearChaptersFailure(_logger, id, ex);
+                }
+
                 continue;
             }
 
             var sortedSegments = segmentsList.SortForItem(id);
 
-            await _chapterOutputService.ProcessChaptersAsync(sortedSegments, true, cancellationToken)
-                .ConfigureAwait(false);
+            try
+            {
+                await _chapterOutputService.ProcessChaptersAsync(sortedSegments, true, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                LogProcessChaptersFailure(_logger, id, ex);
+            }
         }
     }
+
+    [LoggerMessage(EventId = 1000, Level = LogLevel.Error, Message = "Failed to clear chapters for item {Id}, skipping")]
+    private static partial void LogClearChaptersFailure(ILogger logger, Guid id, Exception ex);
+
+    [LoggerMessage(EventId = 1001, Level = LogLevel.Error, Message = "Failed to process chapters for item {Id}, skipping")]
+    private static partial void LogProcessChaptersFailure(ILogger logger, Guid id, Exception ex);
 }

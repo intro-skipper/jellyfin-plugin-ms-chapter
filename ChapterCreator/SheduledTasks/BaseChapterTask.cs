@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using ChapterCreator.Configuration;
 using ChapterCreator.Managers;
 using MediaBrowser.Model.MediaSegments;
+using Microsoft.Extensions.Logging;
 
 namespace ChapterCreator.SheduledTasks;
 
@@ -16,10 +17,15 @@ namespace ChapterCreator.SheduledTasks;
 /// </remarks>
 /// <param name="chapterOutputService">Chapter output service.</param>
 /// <param name="configurationAccessor">Plugin configuration accessor.</param>
-public class BaseChapterTask(IChapterOutputService chapterOutputService, IPluginConfigurationAccessor configurationAccessor) : IChapterTaskRunner
+/// <param name="logger">Logger.</param>
+public partial class BaseChapterTask(
+    IChapterOutputService chapterOutputService,
+    IPluginConfigurationAccessor configurationAccessor,
+    ILogger<BaseChapterTask> logger) : IChapterTaskRunner
 {
     private readonly IChapterOutputService _chapterOutputService = chapterOutputService;
     private readonly IPluginConfigurationAccessor _configurationAccessor = configurationAccessor;
+    private readonly ILogger<BaseChapterTask> _logger = logger;
 
     /// <summary>
     /// Create chapters for all segments on the server.
@@ -52,9 +58,20 @@ public class BaseChapterTask(IChapterOutputService chapterOutputService, IPlugin
 
         await Parallel.ForEachAsync(sortedSegments, options, async (segment, ct) =>
         {
-            await _chapterOutputService.ProcessChaptersAsync(segment, forceOverwrite, ct).ConfigureAwait(false);
+            try
+            {
+                await _chapterOutputService.ProcessChaptersAsync(segment, forceOverwrite, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                LogProcessChaptersFailure(_logger, segment.Key, ex);
+            }
+
             var processed = Interlocked.Increment(ref totalProcessed);
             progress.Report(processed * 100.0 / totalQueued);
         }).ConfigureAwait(false);
     }
+
+    [LoggerMessage(EventId = 1000, Level = LogLevel.Error, Message = "Failed to process chapters for item {Id}, skipping")]
+    private static partial void LogProcessChaptersFailure(ILogger logger, Guid id, Exception ex);
 }
