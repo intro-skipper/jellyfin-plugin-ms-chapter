@@ -21,17 +21,14 @@ namespace ChapterCreator.Managers;
 /// </remarks>
 /// <param name="logger">The logger instance.</param>
 /// <param name="libraryManager">The library manager.</param>
-/// <param name="chapterRepository">The chapter repository.</param>
 /// <param name="configurationAccessor">The plugin configuration accessor.</param>
 public partial class ChapterFileManager(
     ILogger<ChapterFileManager> logger,
     ILibraryManager libraryManager,
-    IChapterRepository chapterRepository,
     IPluginConfigurationAccessor configurationAccessor) : IChapterFileManager
 {
     private readonly ILogger<ChapterFileManager> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly ILibraryManager _libraryManager = libraryManager;
-    private readonly IChapterRepository _chapterRepository = chapterRepository;
     private readonly IPluginConfigurationAccessor _configurationAccessor = configurationAccessor;
 
     private PluginConfiguration EffectiveConfiguration =>
@@ -61,13 +58,6 @@ public partial class ChapterFileManager(
         var segments = psegment.Value;
         var config = EffectiveConfiguration;
         var overwrite = config.OverwriteFiles || forceOverwrite;
-
-        var embeddedChapters = _chapterRepository.GetChapters(id);
-        if (!forceOverwrite && embeddedChapters.Count > 0 && config.SkipEmbeddedChapters)
-        {
-            LogSkippingEmbeddedChapters(_logger, id);
-            return;
-        }
 
         LogProcessingChapters(_logger, id);
 
@@ -425,9 +415,6 @@ public partial class ChapterFileManager(
 
     [LoggerMessage(EventId = 1301, Level = LogLevel.Debug, Message = "Max Parallelism: {MaxParallelism}")]
     private static partial void LogMaxParallelism(ILogger logger, int maxParallelism);
-
-    [LoggerMessage(EventId = 1302, Level = LogLevel.Debug, Message = "Skipping item {Id} as it already has embedded chapters")]
-    private static partial void LogSkippingEmbeddedChapters(ILogger logger, Guid id);
 
     [LoggerMessage(EventId = 1303, Level = LogLevel.Debug, Message = "Processing chapters for item {Id}")]
     private static partial void LogProcessingChapters(ILogger logger, Guid id);

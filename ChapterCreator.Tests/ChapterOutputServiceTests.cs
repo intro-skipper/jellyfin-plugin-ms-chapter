@@ -35,6 +35,7 @@ public class ChapterOutputServiceTests
             chapterFileManager.Object,
             jellyfinChapterManager.Object,
             libraryManager.Object,
+            Mock.Of<MediaBrowser.Controller.MediaEncoding.IMediaEncoder>(),
             NullLogger<ChapterOutputService>.Instance,
             CreateConfigurationAccessor(new PluginConfiguration
             {
@@ -76,6 +77,7 @@ public class ChapterOutputServiceTests
                 chapterFileManager.Object,
                 jellyfinChapterManager.Object,
                 libraryManager.Object,
+                Mock.Of<MediaBrowser.Controller.MediaEncoding.IMediaEncoder>(),
                 logger,
                 CreateConfigurationAccessor(new PluginConfiguration
                 {
@@ -137,6 +139,7 @@ public class ChapterOutputServiceTests
                 chapterFileManager.Object,
                 jellyfinChapterManager.Object,
                 libraryManager.Object,
+                Mock.Of<MediaBrowser.Controller.MediaEncoding.IMediaEncoder>(),
                 logger,
                 CreateConfigurationAccessor(new PluginConfiguration
                 {
@@ -281,8 +284,9 @@ public class ChapterOutputServiceTests
             chapterFileManager.Object,
             jellyfinChapterManager.Object,
             libraryManager.Object,
+            Mock.Of<MediaBrowser.Controller.MediaEncoding.IMediaEncoder>(),
             NullLogger<ChapterOutputService>.Instance,
-            CreateConfigurationAccessor(new PluginConfiguration { OutputMode = outputMode }).Object);
+            CreateConfigurationAccessor(new PluginConfiguration { OutputMode = outputMode, SkipEmbeddedChapters = false }).Object);
     }
 
     private static Mock<IPluginConfigurationAccessor> CreateConfigurationAccessor(PluginConfiguration configuration)

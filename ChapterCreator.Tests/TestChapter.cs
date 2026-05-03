@@ -6,7 +6,6 @@ using ChapterCreator.Data;
 using ChapterCreator.Managers;
 using Jellyfin.Database.Implementations.Enums;
 using MediaBrowser.Controller.Library;
-using MediaBrowser.Controller.Persistence;
 using MediaBrowser.Model.MediaSegments;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -37,7 +36,6 @@ public class TestChapter
         _chapterFileManager = new TestableChapterFileManager(
             NullLogger<ChapterFileManager>.Instance,
             Mock.Of<ILibraryManager>(),
-            Mock.Of<IChapterRepository>(),
             config);
     }
 
@@ -173,9 +171,8 @@ public class TestChapter
     private sealed class TestableChapterFileManager(
         ILogger<ChapterFileManager> logger,
         ILibraryManager libraryManager,
-        IChapterRepository chapterRepository,
         PluginConfiguration configuration)
-        : ChapterFileManager(logger, libraryManager, chapterRepository, CreateConfigurationAccessor(configuration).Object)
+        : ChapterFileManager(logger, libraryManager, CreateConfigurationAccessor(configuration).Object)
     {
         private readonly Collection<(Guid Id, long RuntimeTicks)> _runtimes = [];
 
