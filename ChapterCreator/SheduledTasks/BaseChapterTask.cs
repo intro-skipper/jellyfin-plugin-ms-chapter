@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using ChapterCreator.Configuration;
 using ChapterCreator.Managers;
 using MediaBrowser.Model.MediaSegments;
+using Microsoft.Extensions.Logging;
 
 namespace ChapterCreator.SheduledTasks;
 
@@ -14,9 +16,16 @@ namespace ChapterCreator.SheduledTasks;
 /// Initializes a new instance of the <see cref="BaseChapterTask"/> class.
 /// </remarks>
 /// <param name="chapterOutputService">Chapter output service.</param>
-public class BaseChapterTask(IChapterOutputService chapterOutputService)
+/// <param name="configurationAccessor">Plugin configuration accessor.</param>
+/// <param name="logger">Logger.</param>
+public partial class BaseChapterTask(
+    IChapterOutputService chapterOutputService,
+    IPluginConfigurationAccessor configurationAccessor,
+    ILogger<BaseChapterTask> logger) : IChapterTaskRunner
 {
     private readonly IChapterOutputService _chapterOutputService = chapterOutputService;
+    private readonly IPluginConfigurationAccessor _configurationAccessor = configurationAccessor;
+    private readonly ILogger<BaseChapterTask> _logger = logger;
 
     /// <summary>
     /// Create chapters for all segments on the server.
@@ -39,7 +48,7 @@ public class BaseChapterTask(IChapterOutputService chapterOutputService)
 
         var totalQueued = sortedSegments.Count;
         var totalProcessed = 0;
-        var maxParallelism = Plugin.Instance!.Configuration.MaxParallelism;
+        var maxParallelism = _configurationAccessor.GetConfiguration().MaxParallelism;
 
         var options = new ParallelOptions
         {
@@ -49,9 +58,20 @@ public class BaseChapterTask(IChapterOutputService chapterOutputService)
 
         await Parallel.ForEachAsync(sortedSegments, options, async (segment, ct) =>
         {
-            await _chapterOutputService.ProcessChaptersAsync(segment, forceOverwrite, ct).ConfigureAwait(false);
+            try
+            {
+                await _chapterOutputService.ProcessChaptersAsync(segment, forceOverwrite, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                LogProcessChaptersFailure(_logger, segment.Key, ex);
+            }
+
             var processed = Interlocked.Increment(ref totalProcessed);
             progress.Report(processed * 100.0 / totalQueued);
         }).ConfigureAwait(false);
     }
+
+    [LoggerMessage(EventId = 1000, Level = LogLevel.Error, Message = "Failed to process chapters for item {Id}, skipping")]
+    private static partial void LogProcessChaptersFailure(ILogger logger, Guid id, Exception ex);
 }

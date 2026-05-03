@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using ChapterCreator.Data;
 using ChapterCreator.Managers;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.MediaSegments;
@@ -18,20 +19,26 @@ namespace ChapterCreator.SheduledTasks;
 /// <remarks>
 /// Initializes a new instance of the <see cref="CreateChapterTask"/> class.
 /// </remarks>
-/// <param name="loggerFactory">Logger factory.</param>
 /// <param name="libraryManager">Library manager.</param>
 /// <param name="mediaSegmentManager">MediaSegment manager.</param>
-/// <param name="chapterOutputService">Chapter output service.</param>
-public class CreateChapterTask(
-    ILoggerFactory loggerFactory,
+/// <param name="legacyChapterMigrator">Legacy chapter migrator.</param>
+/// <param name="queueManager">Queue manager.</param>
+/// <param name="chapterTaskRunner">Chapter task runner.</param>
+/// <param name="logger">Logger.</param>
+public partial class CreateChapterTask(
     ILibraryManager libraryManager,
     IMediaSegmentManager mediaSegmentManager,
-    IChapterOutputService chapterOutputService) : IScheduledTask
+    ILegacyChapterMigrator legacyChapterMigrator,
+    IQueueManager queueManager,
+    IChapterTaskRunner chapterTaskRunner,
+    ILogger<CreateChapterTask> logger) : IScheduledTask
 {
-    private readonly ILoggerFactory _loggerFactory = loggerFactory;
     private readonly ILibraryManager _libraryManager = libraryManager;
     private readonly IMediaSegmentManager _mediaSegmentManager = mediaSegmentManager;
-    private readonly IChapterOutputService _chapterOutputService = chapterOutputService;
+    private readonly ILegacyChapterMigrator _legacyChapterMigrator = legacyChapterMigrator;
+    private readonly IQueueManager _queueManager = queueManager;
+    private readonly IChapterTaskRunner _chapterTaskRunner = chapterTaskRunner;
+    private readonly ILogger<CreateChapterTask> _logger = logger;
 
     /// <summary>
     /// Gets the task name.
@@ -61,38 +68,36 @@ public class CreateChapterTask(
     /// <returns>Task.</returns>
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        if (_libraryManager is null)
-        {
-            throw new InvalidOperationException("Library manager was null");
-        }
-
-        var baseChapterTask = new BaseChapterTask(_chapterOutputService);
-
         // Migrate any chapter files from the legacy Jellyfin data folder location.
-        Plugin.Instance!.MigrateLegacyChaptersFolderIfNeeded();
+        _legacyChapterMigrator.MigrateIfNeeded();
 
         var segmentsList = new List<MediaSegmentDto>();
-        // get ItemIds
-        var mediaItems = new QueueManager(_loggerFactory.CreateLogger<QueueManager>(), _libraryManager).GetMediaItems();
-        // get MediaSegments from itemIds
-        foreach (var kvp in mediaItems)
+        foreach (var media in _queueManager.GetMediaItems())
         {
-            foreach (var media in kvp.Value)
+            var item = _libraryManager.GetItemById(media.ItemId);
+            if (item is null)
             {
-                var item = Plugin.Instance!.GetItem(media.ItemId);
-                if (item is null)
-                {
-                    continue;
-                }
-
-                segmentsList.AddRange(await _mediaSegmentManager.GetSegmentsAsync(item, null, new LibraryOptions(), true).ConfigureAwait(false));
+                continue;
             }
+
+            IEnumerable<MediaSegmentDto> itemSegments;
+            try
+            {
+                itemSegments = await _mediaSegmentManager.GetSegmentsAsync(
+                    item, null, new LibraryOptions(), true).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                LogRetrieveMediaSegmentsFailure(_logger, media.ItemId, ex);
+                continue;
+            }
+
+            segmentsList.AddRange(itemSegments);
         }
 
-        // write chapter files
         if (segmentsList.Count > 0)
         {
-            await baseChapterTask.CreateChaptersAsync(progress, segmentsList, false, cancellationToken).ConfigureAwait(false);
+            await _chapterTaskRunner.CreateChaptersAsync(progress, segmentsList, false, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -104,4 +109,7 @@ public class CreateChapterTask(
     {
         return [];
     }
+
+    [LoggerMessage(EventId = 1000, Level = LogLevel.Error, Message = "Failed to retrieve media segments for item {Id}, skipping")]
+    private static partial void LogRetrieveMediaSegmentsFailure(ILogger logger, Guid id, Exception ex);
 }

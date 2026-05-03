@@ -5,3 +5,4 @@ obj/
 .agents/
 artifacts
 *.csproj.lscache
+.worktrees/
