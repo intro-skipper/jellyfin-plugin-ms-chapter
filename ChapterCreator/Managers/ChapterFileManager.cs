@@ -62,32 +62,6 @@ public partial class ChapterFileManager(ILogger<ChapterFileManager> logger) : IC
         var config = Plugin.Instance!.Configuration;
         var overwrite = config.OverwriteFiles || forceOverwrite;
 
-        var embeddedChapters = Plugin.Instance.GetChapters(id);
-        if (!forceOverwrite && embeddedChapters.Count > 0 && config.SkipEmbeddedChapters)
-        {
-            // Chapters in the database may have been written by this plugin in a previous
-            // run (InjectOnly or Both mode). Only treat them as "embedded" – and skip the
-            // item – when no plugin-written chapter XML file already exists next to the
-            // media file. If the XML file exists, the DB chapters originated from this
-            // plugin rather than from the media file itself.
-            var existingPath = Plugin.Instance.GetItemPath(id);
-            var hasPluginXml = false;
-            if (!string.IsNullOrEmpty(existingPath))
-            {
-                try
-                {
-                    hasPluginXml = File.Exists(GetChapterPath(existingPath, _logger));
-                }
-                catch (InvalidOperationException) { }
-            }
-
-            if (!hasPluginXml)
-            {
-                LogSkippingEmbeddedChapters(_logger, id);
-                return;
-            }
-        }
-
         LogProcessingChapters(_logger, id);
 
         try
@@ -437,9 +411,6 @@ public partial class ChapterFileManager(ILogger<ChapterFileManager> logger) : IC
 
     [LoggerMessage(EventId = 1301, Level = LogLevel.Debug, Message = "Max Parallelism: {MaxParallelism}")]
     private static partial void LogMaxParallelism(ILogger logger, int maxParallelism);
-
-    [LoggerMessage(EventId = 1302, Level = LogLevel.Debug, Message = "Skipping item {Id} as it already has embedded chapters")]
-    private static partial void LogSkippingEmbeddedChapters(ILogger logger, Guid id);
 
     [LoggerMessage(EventId = 1303, Level = LogLevel.Debug, Message = "Processing chapters for item {Id}")]
     private static partial void LogProcessingChapters(ILogger logger, Guid id);

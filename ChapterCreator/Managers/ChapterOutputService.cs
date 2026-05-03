@@ -6,6 +6,9 @@ using System.Xml;
 using ChapterCreator.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.MediaEncoding;
+using MediaBrowser.Model.Dlna;
+using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.MediaSegments;
 using Microsoft.Extensions.Logging;
@@ -23,11 +26,13 @@ namespace ChapterCreator.Managers;
 /// <param name="chapterFileManager">The chapter file manager for XML output.</param>
 /// <param name="jellyfinChapterManager">Jellyfin's chapter manager for DB injection.</param>
 /// <param name="libraryManager">The library manager for resolving items.</param>
+/// <param name="mediaEncoder">The media encoder used to probe files for embedded chapters.</param>
 /// <param name="logger">The logger instance.</param>
 public partial class ChapterOutputService(
     IChapterFileManager chapterFileManager,
     JellyfinChapterManager jellyfinChapterManager,
     ILibraryManager libraryManager,
+    IMediaEncoder mediaEncoder,
     ILogger<ChapterOutputService> logger) : IChapterOutputService
 {
     /// <summary>
@@ -43,6 +48,7 @@ public partial class ChapterOutputService(
     private readonly IChapterFileManager _chapterFileManager = chapterFileManager;
     private readonly JellyfinChapterManager _jellyfinChapterManager = jellyfinChapterManager;
     private readonly ILibraryManager _libraryManager = libraryManager;
+    private readonly IMediaEncoder _mediaEncoder = mediaEncoder;
     private readonly ILogger<ChapterOutputService> _logger = logger;
 
     /// <inheritdoc />
@@ -52,7 +58,7 @@ public partial class ChapterOutputService(
     }
 
     /// <inheritdoc />
-    public ValueTask ProcessChaptersAsync(
+    public async ValueTask ProcessChaptersAsync(
         KeyValuePair<Guid, List<MediaSegmentDto>> segments,
         bool forceOverwrite,
         CancellationToken cancellationToken)
@@ -61,6 +67,21 @@ public partial class ChapterOutputService(
 
         var config = Plugin.Instance?.Configuration ?? new PluginConfiguration();
         var outputMode = config.OutputMode;
+
+        // Before writing XML files, check whether the media file itself has chapters
+        // embedded in the container.  Only probe the file when SkipEmbeddedChapters is
+        // enabled and the XML output path would actually be reached; this avoids calling
+        // FFProbe unnecessarily.
+        if (!forceOverwrite
+            && config.SkipEmbeddedChapters
+            && outputMode is ChapterOutputMode.XmlOnly or ChapterOutputMode.Both)
+        {
+            if (await HasFileEmbeddedChaptersAsync(segments.Key, cancellationToken).ConfigureAwait(false))
+            {
+                LogSkippingEmbeddedChapters(_logger, segments.Key);
+                return;
+            }
+        }
 
         if (outputMode is ChapterOutputMode.XmlOnly or ChapterOutputMode.Both)
         {
@@ -85,8 +106,39 @@ public partial class ChapterOutputService(
                 LogDbInjectionFailure(_logger, segments.Key, ex);
             }
         }
+    }
 
-        return default;
+    /// <summary>
+    /// Returns <see langword="true"/> when the media file identified by <paramref name="itemId"/>
+    /// has chapter marks embedded in its container (as reported by FFProbe), regardless of what
+    /// is currently stored in Jellyfin's chapter database.
+    /// </summary>
+    private async Task<bool> HasFileEmbeddedChaptersAsync(Guid itemId, CancellationToken cancellationToken)
+    {
+        var filePath = Plugin.Instance?.GetItemPath(itemId);
+        if (string.IsNullOrEmpty(filePath))
+        {
+            return false;
+        }
+
+        try
+        {
+            var mediaInfo = await _mediaEncoder.GetMediaInfo(
+                new MediaInfoRequest
+                {
+                    MediaSource = new MediaSourceInfo { Path = filePath },
+                    ExtractChapters = true,
+                    MediaType = DlnaProfileType.Video
+                },
+                cancellationToken).ConfigureAwait(false);
+
+            return mediaInfo.Chapters.Length > 0;
+        }
+        catch (Exception ex)
+        {
+            LogEmbeddedChapterProbeFailed(_logger, itemId, ex);
+            return false;
+        }
     }
 
     /// <inheritdoc />
@@ -303,4 +355,10 @@ public partial class ChapterOutputService(
 
     [LoggerMessage(EventId = 1111, Level = LogLevel.Debug, Message = "Injected {Count} chapters into Jellyfin DB for item {Id}")]
     private static partial void LogInjectedChapters(ILogger logger, int count, Guid id);
+
+    [LoggerMessage(EventId = 1112, Level = LogLevel.Debug, Message = "Skipping item {Id}: media file has embedded chapters")]
+    private static partial void LogSkippingEmbeddedChapters(ILogger logger, Guid id);
+
+    [LoggerMessage(EventId = 1113, Level = LogLevel.Warning, Message = "Failed to probe item {Id} for embedded chapters; treating as no embedded chapters")]
+    private static partial void LogEmbeddedChapterProbeFailed(ILogger logger, Guid id, Exception ex);
 }
