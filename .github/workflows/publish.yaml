@@ -16,9 +16,6 @@ jobs:
       - name: Increment patch version
         shell: bash
         run: |
-          GIT_HASH=$(git rev-parse --short HEAD)
-          echo "GIT_HASH=${GIT_HASH}" >> $GITHUB_ENV
-
           python - <<'PY'
           import os
           import re
@@ -91,9 +88,13 @@ jobs:
 
       - name: Create new release with tag
         if: github.event_name != 'pull_request'
-        run: gh release create "${{ env.NEW_FILE_VERSION }}-${{ env.GIT_HASH }}" "ChapterCreator-${{ env.NEW_FILE_VERSION }}.zip" --title "Release ${{ env.NEW_FILE_VERSION }}-${{ env.GIT_HASH }}" --latest --generate-notes --target master
+        run: gh release create "${{ env.NEW_FILE_VERSION }}" "ChapterCreator-${{ env.NEW_FILE_VERSION }}.zip" --title "Release ${{ env.NEW_FILE_VERSION }}" --latest --generate-notes --target master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Print MD5 Hash
+        if: github.event_name != 'pull_request'
+        run: md5sum ChapterCreator-${{ env.NEW_FILE_VERSION }}.zip | awk '{ print $1 }'
 
       - name: Commit updated Directory.Build.props
         if: ${{ inputs.prerelease != true }}
