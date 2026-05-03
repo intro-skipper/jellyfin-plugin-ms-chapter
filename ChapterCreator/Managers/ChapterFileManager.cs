@@ -65,8 +65,27 @@ public partial class ChapterFileManager(ILogger<ChapterFileManager> logger) : IC
         var embeddedChapters = Plugin.Instance.GetChapters(id);
         if (!forceOverwrite && embeddedChapters.Count > 0 && config.SkipEmbeddedChapters)
         {
-            LogSkippingEmbeddedChapters(_logger, id);
-            return;
+            // Chapters in the database may have been written by this plugin in a previous
+            // run (InjectOnly or Both mode). Only treat them as "embedded" – and skip the
+            // item – when no plugin-written chapter XML file already exists next to the
+            // media file. If the XML file exists, the DB chapters originated from this
+            // plugin rather than from the media file itself.
+            var existingPath = Plugin.Instance.GetItemPath(id);
+            var hasPluginXml = false;
+            if (!string.IsNullOrEmpty(existingPath))
+            {
+                try
+                {
+                    hasPluginXml = File.Exists(GetChapterPath(existingPath, _logger));
+                }
+                catch (InvalidOperationException) { }
+            }
+
+            if (!hasPluginXml)
+            {
+                LogSkippingEmbeddedChapters(_logger, id);
+                return;
+            }
         }
 
         LogProcessingChapters(_logger, id);
