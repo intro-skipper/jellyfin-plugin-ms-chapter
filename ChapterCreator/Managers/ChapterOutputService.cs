@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
 using ChapterCreator.Configuration;
+using ChapterCreator.Data;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.MediaEncoding;
@@ -28,12 +30,14 @@ namespace ChapterCreator.Managers;
 /// <param name="libraryManager">The library manager for resolving items.</param>
 /// <param name="mediaEncoder">The media encoder used to probe files for embedded chapters.</param>
 /// <param name="logger">The logger instance.</param>
+/// <param name="configurationAccessor">The plugin configuration accessor.</param>
 public partial class ChapterOutputService(
     IChapterFileManager chapterFileManager,
     JellyfinChapterManager jellyfinChapterManager,
     ILibraryManager libraryManager,
     IMediaEncoder mediaEncoder,
-    ILogger<ChapterOutputService> logger) : IChapterOutputService
+    ILogger<ChapterOutputService> logger,
+    IPluginConfigurationAccessor configurationAccessor) : IChapterOutputService
 {
     /// <summary>
     /// Supported time formats for parsing chapter timestamps from external XML files.
@@ -50,6 +54,7 @@ public partial class ChapterOutputService(
     private readonly ILibraryManager _libraryManager = libraryManager;
     private readonly IMediaEncoder _mediaEncoder = mediaEncoder;
     private readonly ILogger<ChapterOutputService> _logger = logger;
+    private readonly IPluginConfigurationAccessor _configurationAccessor = configurationAccessor;
 
     /// <inheritdoc />
     public void LogConfiguration()
@@ -65,8 +70,9 @@ public partial class ChapterOutputService(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var config = Plugin.Instance?.Configuration ?? new PluginConfiguration();
+        var config = _configurationAccessor.GetConfiguration();
         var outputMode = config.OutputMode;
+        List<ExceptionDispatchInfo>? failures = null;
 
         // Before writing XML files, check whether the media file itself has chapters
         // embedded in the container.  Only probe the file when SkipEmbeddedChapters is
@@ -92,6 +98,8 @@ public partial class ChapterOutputService(
             catch (Exception ex)
             {
                 LogXmlWriteFailure(_logger, segments.Key, ex);
+                failures ??= [];
+                failures.Add(ExceptionDispatchInfo.Capture(ex));
             }
         }
 
@@ -104,7 +112,19 @@ public partial class ChapterOutputService(
             catch (Exception ex)
             {
                 LogDbInjectionFailure(_logger, segments.Key, ex);
+                failures ??= [];
+                failures.Add(ExceptionDispatchInfo.Capture(ex));
             }
+        }
+
+        if (failures is { Count: 1 })
+        {
+            failures[0].Throw();
+        }
+
+        if (failures is { Count: > 1 })
+        {
+            throw new AggregateException(failures.ConvertAll(static failure => failure.SourceException));
         }
     }
 
@@ -115,7 +135,8 @@ public partial class ChapterOutputService(
     /// </summary>
     private async Task<bool> HasFileEmbeddedChaptersAsync(Guid itemId, CancellationToken cancellationToken)
     {
-        var filePath = Plugin.Instance?.GetItemPath(itemId);
+        var item = _libraryManager.GetItemById(itemId);
+        var filePath = item?.Path;
         if (string.IsNullOrEmpty(filePath))
         {
             return false;
@@ -146,7 +167,7 @@ public partial class ChapterOutputService(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var config = Plugin.Instance?.Configuration ?? new PluginConfiguration();
+        var config = _configurationAccessor.GetConfiguration();
         if (!config.ImportXmlChapters)
         {
             return default;
@@ -157,8 +178,8 @@ public partial class ChapterOutputService(
             return default;
         }
 
-        var filePath = Plugin.Instance?.GetItemPath(itemId);
-        if (string.IsNullOrEmpty(filePath))
+        var item = _libraryManager.GetItemById(itemId);
+        if (item is not Video video || string.IsNullOrEmpty(video.Path))
         {
             LogSkipXmlImportNoPath(_logger, itemId);
             return default;
@@ -167,7 +188,7 @@ public partial class ChapterOutputService(
         string chapterXmlPath;
         try
         {
-            chapterXmlPath = ChapterFileManager.GetChapterPath(filePath, _logger);
+            chapterXmlPath = ChapterFileManager.GetChapterPath(video.Path, _logger);
         }
         catch (InvalidOperationException ex)
         {
@@ -178,13 +199,6 @@ public partial class ChapterOutputService(
         if (!System.IO.File.Exists(chapterXmlPath))
         {
             LogNoXmlFileFound(_logger, chapterXmlPath, itemId);
-            return default;
-        }
-
-        var item = _libraryManager.GetItemById(itemId);
-        if (item is not Video video)
-        {
-            LogNotAVideo(_logger, itemId);
             return default;
         }
 
@@ -200,6 +214,57 @@ public partial class ChapterOutputService(
         catch (Exception ex)
         {
             LogXmlImportFailure(_logger, chapterXmlPath, itemId, ex);
+            throw;
+        }
+
+        return default;
+    }
+
+    /// <inheritdoc />
+    public ValueTask ClearChaptersAsync(Guid itemId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var config = _configurationAccessor.GetConfiguration();
+        var outputMode = config.OutputMode;
+        List<ExceptionDispatchInfo>? failures = null;
+
+        if (outputMode is ChapterOutputMode.XmlOnly or ChapterOutputMode.Both)
+        {
+            try
+            {
+                DeleteChapterFile(itemId);
+            }
+            catch (Exception ex)
+            {
+                LogXmlDeleteFailure(_logger, itemId, ex);
+                failures ??= [];
+                failures.Add(ExceptionDispatchInfo.Capture(ex));
+            }
+        }
+
+        if (outputMode is ChapterOutputMode.InjectOnly or ChapterOutputMode.Both)
+        {
+            try
+            {
+                ClearInjectedChapters(itemId);
+            }
+            catch (Exception ex)
+            {
+                LogDbClearFailure(_logger, itemId, ex);
+                failures ??= [];
+                failures.Add(ExceptionDispatchInfo.Capture(ex));
+            }
+        }
+
+        if (failures is { Count: 1 })
+        {
+            failures[0].Throw();
+        }
+
+        if (failures is { Count: > 1 })
+        {
+            throw new AggregateException(failures.ConvertAll(static failure => failure.SourceException));
         }
 
         return default;
@@ -320,45 +385,110 @@ public partial class ChapterOutputService(
         LogInjectedChapters(_logger, chapterInfos.Count, itemId);
     }
 
+    private void ClearInjectedChapters(Guid itemId)
+    {
+        var item = _libraryManager.GetItemById(itemId);
+        if (item is not Video video)
+        {
+            LogNotAVideoClearing(_logger, itemId);
+            return;
+        }
+
+        _jellyfinChapterManager.SaveChapters(video, []);
+        LogClearedInjectedChapters(_logger, itemId);
+    }
+
+    private void DeleteChapterFile(Guid itemId)
+    {
+        var item = _libraryManager.GetItemById(itemId);
+        var filePath = item?.Path;
+        if (string.IsNullOrEmpty(filePath))
+        {
+            LogSkipXmlDeleteNoPath(_logger, itemId);
+            return;
+        }
+
+        string chapterPath;
+        try
+        {
+            chapterPath = ChapterFileManager.GetChapterPath(filePath, _logger);
+        }
+        catch (InvalidOperationException ex)
+        {
+            LogSkipXmlDeleteNoChapterPath(_logger, itemId, ex);
+            return;
+        }
+
+        if (!System.IO.File.Exists(chapterPath))
+        {
+            LogNoXmlFileToDelete(_logger, chapterPath, itemId);
+            return;
+        }
+
+        System.IO.File.Delete(chapterPath);
+        LogDeletedXmlFile(_logger, chapterPath, itemId);
+    }
+
     [LoggerMessage(EventId = 1100, Level = LogLevel.Error, Message = "Failed to write XML chapter file for item {Id}")]
     private static partial void LogXmlWriteFailure(ILogger logger, Guid id, Exception ex);
 
     [LoggerMessage(EventId = 1101, Level = LogLevel.Error, Message = "Failed to inject chapters into Jellyfin DB for item {Id}")]
     private static partial void LogDbInjectionFailure(ILogger logger, Guid id, Exception ex);
 
-    [LoggerMessage(EventId = 1102, Level = LogLevel.Debug, Message = "Skip XML import for {Id}: unable to get item path")]
+    [LoggerMessage(EventId = 1102, Level = LogLevel.Error, Message = "Failed to delete XML chapter file for item {Id}")]
+    private static partial void LogXmlDeleteFailure(ILogger logger, Guid id, Exception ex);
+
+    [LoggerMessage(EventId = 1103, Level = LogLevel.Error, Message = "Failed to clear injected Jellyfin chapters for item {Id}")]
+    private static partial void LogDbClearFailure(ILogger logger, Guid id, Exception ex);
+
+    [LoggerMessage(EventId = 1104, Level = LogLevel.Debug, Message = "Skip XML import for {Id}: unable to get item path")]
     private static partial void LogSkipXmlImportNoPath(ILogger logger, Guid id);
 
-    [LoggerMessage(EventId = 1103, Level = LogLevel.Debug, Message = "Skip XML import for {Id}: could not resolve chapter path")]
+    [LoggerMessage(EventId = 1105, Level = LogLevel.Debug, Message = "Skip XML import for {Id}: could not resolve chapter path")]
     private static partial void LogSkipXmlImportNoChapterPath(ILogger logger, Guid id, Exception ex);
 
-    [LoggerMessage(EventId = 1104, Level = LogLevel.Debug, Message = "No XML chapter file found at {Path} for item {Id}")]
+    [LoggerMessage(EventId = 1106, Level = LogLevel.Debug, Message = "Skip XML deletion for {Id}: unable to get item path")]
+    private static partial void LogSkipXmlDeleteNoPath(ILogger logger, Guid id);
+
+    [LoggerMessage(EventId = 1107, Level = LogLevel.Debug, Message = "Skip XML deletion for {Id}: could not resolve chapter path")]
+    private static partial void LogSkipXmlDeleteNoChapterPath(ILogger logger, Guid id, Exception ex);
+
+    [LoggerMessage(EventId = 1108, Level = LogLevel.Debug, Message = "No XML chapter file found at {Path} for item {Id}")]
     private static partial void LogNoXmlFileFound(ILogger logger, string path, Guid id);
 
-    [LoggerMessage(EventId = 1105, Level = LogLevel.Warning, Message = "Item {Id} is not a Video, skipping XML chapter import")]
-    private static partial void LogNotAVideo(ILogger logger, Guid id);
+    [LoggerMessage(EventId = 1109, Level = LogLevel.Debug, Message = "No XML chapter file found to delete at {Path} for item {Id}")]
+    private static partial void LogNoXmlFileToDelete(ILogger logger, string path, Guid id);
 
-    [LoggerMessage(EventId = 1106, Level = LogLevel.Debug, Message = "Imported {Count} chapters from XML for item {Id}")]
+    [LoggerMessage(EventId = 1110, Level = LogLevel.Debug, Message = "Deleted XML chapter file {Path} for item {Id}")]
+    private static partial void LogDeletedXmlFile(ILogger logger, string path, Guid id);
+
+    [LoggerMessage(EventId = 1112, Level = LogLevel.Debug, Message = "Imported {Count} chapters from XML for item {Id}")]
     private static partial void LogImportedChapters(ILogger logger, int count, Guid id);
 
-    [LoggerMessage(EventId = 1107, Level = LogLevel.Error, Message = "Failed to import chapters from XML file {Path} for item {Id}")]
+    [LoggerMessage(EventId = 1113, Level = LogLevel.Error, Message = "Failed to import chapters from XML file {Path} for item {Id}")]
     private static partial void LogXmlImportFailure(ILogger logger, string path, Guid id, Exception ex);
 
-    [LoggerMessage(EventId = 1108, Level = LogLevel.Warning, Message = "Item {Id} is not a Video, skipping Jellyfin chapter injection")]
+    [LoggerMessage(EventId = 1114, Level = LogLevel.Warning, Message = "Item {Id} is not a Video, skipping Jellyfin chapter injection")]
     private static partial void LogNotAVideoInjection(ILogger logger, Guid id);
 
-    [LoggerMessage(EventId = 1109, Level = LogLevel.Debug, Message = "No chapters generated for item {Id}, skipping injection")]
+    [LoggerMessage(EventId = 1115, Level = LogLevel.Debug, Message = "No chapters generated for item {Id}, skipping injection")]
     private static partial void LogNoChaptersGenerated(ILogger logger, Guid id);
 
-    [LoggerMessage(EventId = 1110, Level = LogLevel.Warning, Message = "Skipping chapter with unparseable StartTime '{StartTime}' for item {Id}")]
+    [LoggerMessage(EventId = 1116, Level = LogLevel.Warning, Message = "Skipping chapter with unparseable StartTime '{StartTime}' for item {Id}")]
     private static partial void LogUnparseableStartTime(ILogger logger, string startTime, Guid id);
 
-    [LoggerMessage(EventId = 1111, Level = LogLevel.Debug, Message = "Injected {Count} chapters into Jellyfin DB for item {Id}")]
+    [LoggerMessage(EventId = 1117, Level = LogLevel.Debug, Message = "Injected {Count} chapters into Jellyfin DB for item {Id}")]
     private static partial void LogInjectedChapters(ILogger logger, int count, Guid id);
 
-    [LoggerMessage(EventId = 1112, Level = LogLevel.Debug, Message = "Skipping item {Id}: media file has embedded chapters")]
+    [LoggerMessage(EventId = 1118, Level = LogLevel.Debug, Message = "Cleared injected Jellyfin chapters for item {Id}")]
+    private static partial void LogClearedInjectedChapters(ILogger logger, Guid id);
+
+    [LoggerMessage(EventId = 1119, Level = LogLevel.Warning, Message = "Item {Id} is not a Video, skipping Jellyfin chapter clearing")]
+    private static partial void LogNotAVideoClearing(ILogger logger, Guid id);
+
+    [LoggerMessage(EventId = 1120, Level = LogLevel.Debug, Message = "Skipping item {Id}: media file has embedded chapters")]
     private static partial void LogSkippingEmbeddedChapters(ILogger logger, Guid id);
 
-    [LoggerMessage(EventId = 1113, Level = LogLevel.Warning, Message = "Failed to probe item {Id} for embedded chapters; treating as no embedded chapters")]
+    [LoggerMessage(EventId = 1121, Level = LogLevel.Warning, Message = "Failed to probe item {Id} for embedded chapters; treating as no embedded chapters")]
     private static partial void LogEmbeddedChapterProbeFailed(ILogger logger, Guid id, Exception ex);
 }

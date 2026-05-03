@@ -1,3 +1,4 @@
+using ChapterCreator.Data;
 using MediaBrowser.Model.Plugins;
 
 namespace ChapterCreator.Configuration;

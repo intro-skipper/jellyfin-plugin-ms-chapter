@@ -1,4 +1,4 @@
-namespace ChapterCreator.Configuration;
+namespace ChapterCreator.Data;
 
 /// <summary>
 /// Defines how chapter data is output.

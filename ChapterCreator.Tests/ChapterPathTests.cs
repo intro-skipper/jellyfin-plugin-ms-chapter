@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Reflection;
+using ChapterCreator.Data;
 using ChapterCreator.Managers;
 using Xunit;
 
