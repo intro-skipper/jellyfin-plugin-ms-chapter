@@ -127,7 +127,11 @@ public partial class QueueManager(
         // If any libraries have been selected for analysis, log their names.
         if (selectedLibraries.Count > 0)
         {
-            LogSelectedLibraries(_logger, string.Join(", ", selectedLibraries));
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                var selected = string.Join(", ", selectedLibraries);
+                LogSelectedLibraries(_logger, selected);
+            }
         }
         else
         {

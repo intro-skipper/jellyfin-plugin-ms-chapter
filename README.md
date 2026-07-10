@@ -8,7 +8,7 @@ This plugin converts existing media segments (like Intros and Outros) into stand
 
 ## Requirements
 
-- ⚠️ Jellyfin 10.10 or newer
+- Jellyfin 12-compatible server
 - Writeable media library access (read-only libraries are not supported)
 
 ## Features
