@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
--
+- Rebuild against Jellyfin 12.0.0-rc4 to keep the plugin configuration page compatible with the Jellyfin 12 web client.
 
 ## [0.6.0] - 2026-07-10
 
