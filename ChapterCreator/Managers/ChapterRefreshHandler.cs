@@ -69,7 +69,7 @@ public sealed partial class ChapterRefreshHandler(
         var config = _configurationAccessor.GetConfiguration();
         if (config.SkipEmbeddedChapters
             || config.OutputMode is not (ChapterOutputMode.InjectOnly or ChapterOutputMode.Both)
-            || args.UpdateReason != ItemUpdateType.MetadataImport
+            || (args.UpdateReason & ItemUpdateType.MetadataImport) == 0
             || args.Item is not (Episode or Movie)
             || !_itemsBeingReinjected.TryAdd(args.Item.Id, 0))
         {
