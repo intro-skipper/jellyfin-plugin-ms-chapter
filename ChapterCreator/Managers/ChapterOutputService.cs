@@ -126,17 +126,23 @@ public partial class ChapterOutputService(
     }
 
     /// <inheritdoc />
-    public ValueTask InjectChaptersAsync(
+    public async ValueTask InjectChaptersAsync(
         KeyValuePair<Guid, List<MediaSegmentDto>> segments,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         var config = _configurationAccessor.GetConfiguration();
-        if (config.SkipEmbeddedChapters
-            || config.OutputMode is not (ChapterOutputMode.InjectOnly or ChapterOutputMode.Both))
+        if (config.OutputMode is not (ChapterOutputMode.InjectOnly or ChapterOutputMode.Both))
         {
-            return default;
+            return;
+        }
+
+        if (config.SkipEmbeddedChapters
+            && await HasFileEmbeddedChaptersAsync(segments.Key, cancellationToken).ConfigureAwait(false))
+        {
+            LogSkippingEmbeddedChapters(_logger, segments.Key);
+            return;
         }
 
         try
@@ -148,8 +154,6 @@ public partial class ChapterOutputService(
             LogDbInjectionFailure(_logger, segments.Key, ex);
             throw;
         }
-
-        return default;
     }
 
     /// <summary>

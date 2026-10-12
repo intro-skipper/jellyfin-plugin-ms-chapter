@@ -93,6 +93,53 @@ public class ChapterOutputServiceTests
     }
 
     [Fact]
+    public async Task InjectChaptersAsync_WhenEmbeddedChaptersAreSkippedAndNoneExist_InjectsChapters()
+    {
+        var itemId = Guid.NewGuid();
+        var video = new Video { Id = itemId, Path = @"C:\media\episode.mkv" };
+        var chapterFileManager = new Mock<IChapterFileManager>(MockBehavior.Strict);
+        chapterFileManager
+            .Setup(manager => manager.ToChapter(itemId, It.IsAny<IReadOnlyCollection<MediaSegmentDto>>()))
+            .Returns([new Chapter { StartTime = "00:00:01.00", Title = "Intro" }]);
+
+        var libraryManager = new Mock<ILibraryManager>(MockBehavior.Strict);
+        libraryManager
+            .Setup(manager => manager.GetItemById(itemId))
+            .Returns(video);
+
+        var mediaEncoder = new Mock<IMediaEncoder>(MockBehavior.Strict);
+        mediaEncoder
+            .Setup(encoder => encoder.GetMediaInfo(It.IsAny<MediaInfoRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MediaInfo { Chapters = [] });
+
+        var jellyfinChapterManager = new Mock<MediaBrowser.Controller.Chapters.IChapterManager>(MockBehavior.Strict);
+        jellyfinChapterManager
+            .Setup(manager => manager.SaveChapters(
+                It.IsAny<Video>(),
+                It.IsAny<List<ChapterInfo>>()));
+
+        var sut = new ChapterOutputService(
+            chapterFileManager.Object,
+            jellyfinChapterManager.Object,
+            libraryManager.Object,
+            mediaEncoder.Object,
+            NullLogger<ChapterOutputService>.Instance,
+            CreateConfigurationAccessor(new PluginConfiguration
+            {
+                OutputMode = ChapterOutputMode.InjectOnly,
+                SkipEmbeddedChapters = true
+            }).Object);
+
+        await sut.InjectChaptersAsync(CreateSegments(itemId), CancellationToken.None);
+
+        jellyfinChapterManager.Verify(manager => manager.SaveChapters(
+            video,
+            It.Is<List<ChapterInfo>>(chapters => chapters.Count == 1)), Times.Once);
+        mediaEncoder.Verify(encoder => encoder.GetMediaInfo(It.IsAny<MediaInfoRequest>(), It.IsAny<CancellationToken>()), Times.Once);
+        chapterFileManager.Verify(manager => manager.ToChapter(itemId, It.IsAny<IReadOnlyCollection<MediaSegmentDto>>()), Times.Once);
+    }
+
+    [Fact]
     public async Task ImportFromXmlAsync_WhenXmlFileIsMissing_ReturnsQuietly()
     {
         var itemId = Guid.NewGuid();
