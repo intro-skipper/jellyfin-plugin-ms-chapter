@@ -58,6 +58,41 @@ public class ChapterOutputServiceTests
     }
 
     [Fact]
+    public async Task ProcessChaptersAsync_WhenEmbeddedChaptersAreSkipped_DoesNotOverwriteWhenForced()
+    {
+        var itemId = Guid.NewGuid();
+        var chapterFileManager = new Mock<IChapterFileManager>(MockBehavior.Strict);
+        var libraryManager = new Mock<ILibraryManager>(MockBehavior.Strict);
+        libraryManager
+            .Setup(manager => manager.GetItemById(itemId))
+            .Returns(new Video { Id = itemId, Path = @"C:\media\episode.mkv" });
+
+        var mediaEncoder = new Mock<IMediaEncoder>(MockBehavior.Strict);
+        mediaEncoder
+            .Setup(encoder => encoder.GetMediaInfo(It.IsAny<MediaInfoRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MediaInfo { Chapters = [new ChapterInfo { StartPositionTicks = 0 }] });
+
+        var jellyfinChapterManager = new Mock<MediaBrowser.Controller.Chapters.IChapterManager>(MockBehavior.Strict);
+        var sut = new ChapterOutputService(
+            chapterFileManager.Object,
+            jellyfinChapterManager.Object,
+            libraryManager.Object,
+            mediaEncoder.Object,
+            NullLogger<ChapterOutputService>.Instance,
+            CreateConfigurationAccessor(new PluginConfiguration
+            {
+                OutputMode = ChapterOutputMode.Both,
+                SkipEmbeddedChapters = true
+            }).Object);
+
+        await sut.ProcessChaptersAsync(CreateSegments(itemId), true, CancellationToken.None);
+
+        jellyfinChapterManager.VerifyNoOtherCalls();
+        chapterFileManager.VerifyNoOtherCalls();
+        mediaEncoder.Verify(encoder => encoder.GetMediaInfo(It.IsAny<MediaInfoRequest>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task ImportFromXmlAsync_WhenXmlFileIsMissing_ReturnsQuietly()
     {
         var itemId = Guid.NewGuid();

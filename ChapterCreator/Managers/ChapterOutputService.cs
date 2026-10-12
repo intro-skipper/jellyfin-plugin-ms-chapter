@@ -77,8 +77,7 @@ public partial class ChapterOutputService(
         // Before writing or injecting chapters, check whether the media file itself has
         // chapters embedded in the container.  This prevents generated chapters from
         // competing with the file's chapter set in either output mode.
-        if (!forceOverwrite
-            && config.SkipEmbeddedChapters)
+        if (config.SkipEmbeddedChapters)
         {
             if (await HasFileEmbeddedChaptersAsync(segments.Key, cancellationToken).ConfigureAwait(false))
             {
