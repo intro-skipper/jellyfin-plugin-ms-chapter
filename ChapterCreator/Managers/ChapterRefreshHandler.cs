@@ -32,7 +32,7 @@ public sealed partial class ChapterRefreshHandler(
     IMediaSegmentManager mediaSegmentManager,
     IChapterOutputService chapterOutputService,
     IPluginConfigurationAccessor configurationAccessor,
-    ILogger<ChapterRefreshHandler> logger) : IHostedService
+    ILogger<ChapterRefreshHandler> logger) : IHostedService, IDisposable
 {
     private readonly ILibraryManager _libraryManager = libraryManager;
     private readonly IMediaSegmentManager _mediaSegmentManager = mediaSegmentManager;
