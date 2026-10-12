@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ChapterCreator.Configuration;
+using ChapterCreator.Data;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
@@ -48,12 +50,18 @@ public sealed partial class ChapterRefreshHandler(
     }
 
     /// <inheritdoc />
-    public Task StopAsync(CancellationToken cancellationToken)
+    public async Task StopAsync(CancellationToken cancellationToken)
     {
         _libraryManager.ItemUpdated -= OnItemUpdated;
-        _shutdown.Cancel();
+        await _shutdown.CancelAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        _libraryManager.ItemUpdated -= OnItemUpdated;
         _shutdown.Dispose();
-        return Task.CompletedTask;
+        GC.SuppressFinalize(this);
     }
 
     private void OnItemUpdated(object? sender, ItemChangeEventArgs args)
@@ -81,7 +89,7 @@ public sealed partial class ChapterRefreshHandler(
                 new LibraryOptions(),
                 true).ConfigureAwait(false);
 
-            if (segments.Count == 0)
+            if (!segments.Any())
             {
                 return;
             }
