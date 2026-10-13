@@ -32,6 +32,17 @@ public interface IChapterOutputService
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Injects generated chapters into Jellyfin's database without writing XML files.
+    /// Used to restore plugin chapters after Jellyfin re-imports embedded file chapters.
+    /// </summary>
+    /// <param name="segments">Key value pair of item ID to its media segments.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A <see cref="ValueTask"/> representing the asynchronous operation.</returns>
+    ValueTask InjectChaptersAsync(
+        KeyValuePair<Guid, List<MediaSegmentDto>> segments,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Imports chapters from an existing XML chapter file into Jellyfin's database.
     /// Used when no media segments exist but an XML file is present.
     /// </summary>

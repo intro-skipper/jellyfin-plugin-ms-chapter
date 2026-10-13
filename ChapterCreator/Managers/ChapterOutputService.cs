@@ -74,13 +74,10 @@ public partial class ChapterOutputService(
         var outputMode = config.OutputMode;
         List<ExceptionDispatchInfo>? failures = null;
 
-        // Before writing XML files, check whether the media file itself has chapters
-        // embedded in the container.  Only probe the file when SkipEmbeddedChapters is
-        // enabled and the XML output path would actually be reached; this avoids calling
-        // FFProbe unnecessarily.
-        if (!forceOverwrite
-            && config.SkipEmbeddedChapters
-            && outputMode is ChapterOutputMode.XmlOnly or ChapterOutputMode.Both)
+        // Before writing or injecting chapters, check whether the media file itself has
+        // chapters embedded in the container.  This prevents generated chapters from
+        // competing with the file's chapter set in either output mode.
+        if (config.SkipEmbeddedChapters)
         {
             if (await HasFileEmbeddedChaptersAsync(segments.Key, cancellationToken).ConfigureAwait(false))
             {
@@ -125,6 +122,37 @@ public partial class ChapterOutputService(
         if (failures is { Count: > 1 })
         {
             throw new AggregateException(failures.ConvertAll(static failure => failure.SourceException));
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask InjectChaptersAsync(
+        KeyValuePair<Guid, List<MediaSegmentDto>> segments,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var config = _configurationAccessor.GetConfiguration();
+        if (config.OutputMode is not (ChapterOutputMode.InjectOnly or ChapterOutputMode.Both))
+        {
+            return;
+        }
+
+        if (config.SkipEmbeddedChapters
+            && await HasFileEmbeddedChaptersAsync(segments.Key, cancellationToken).ConfigureAwait(false))
+        {
+            LogSkippingEmbeddedChapters(_logger, segments.Key);
+            return;
+        }
+
+        try
+        {
+            InjectChaptersIntoJellyfin(segments.Key, segments.Value);
+        }
+        catch (Exception ex)
+        {
+            LogDbInjectionFailure(_logger, segments.Key, ex);
+            throw;
         }
     }
 

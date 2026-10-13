@@ -21,5 +21,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<ILegacyChapterMigrator, LegacyChapterMigrator>();
         serviceCollection.AddSingleton<IQueueManager, QueueManager>();
         serviceCollection.AddSingleton<IChapterTaskRunner, BaseChapterTask>();
+        serviceCollection.AddHostedService<ChapterRefreshHandler>();
     }
 }
