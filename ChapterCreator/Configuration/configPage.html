@@ -9,6 +9,51 @@
             <div data-role="content">
                 <div class="content-primary">
                     <form id="TemplateConfigForm">
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="OutputMode"> Chapter Output Mode </label>
+                            <select id="OutputMode" is="emby-select">
+                                <option value="XmlOnly">XML Files Only</option>
+                                <option value="InjectOnly">Jellyfin Database Only</option>
+                                <option value="Both">Both (XML + Database)</option>
+                            </select>
+                            <div class="fieldDescription">Choose how chapters are saved. XML files are written next to media files. Jellyfin Database makes chapters appear in the player timeline.</div>
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input id="SkipEmbeddedChapters" type="checkbox" is="emby-checkbox" checked />
+                                <span>Skip items with embedded chapters</span>
+                            </label>
+
+                            <div class="fieldDescription">If checked, the plugin will skip items with embedded chapters.</div>
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input id="AutoRefresh" type="checkbox" is="emby-checkbox" checked />
+                                <span>Auto-refresh chapters during library scan</span>
+                            </label>
+
+                            <div class="fieldDescription">If checked, chapters will be automatically created or updated when items are scanned during a library refresh.</div>
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input id="ImportXmlChapters" type="checkbox" is="emby-checkbox" checked />
+                                <span>Import previous XML into Jellyfin database</span>
+                            </label>
+
+                            <div class="fieldDescription">If checked, existing XML chapter files will be imported into Jellyfin's database when no media segments are available.</div>
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
+                                <input id="OverwriteFiles" type="checkbox" is="emby-checkbox" checked />
+                                <span>Update existing XML chapter files</span>
+                            </label>
+
+                            <div class="fieldDescription">If checked, the plugin will update previously created XML files to keep them in sync with Media Segments.</div>
+                        </div>
+
+                        <fieldset class="chapterLabelsSection">
+                            <legend>Chapter Labels</legend>
+
                         <div class="inputContainer">
                             <label class="inputLabel inputLabelUnfocused" for="Intro"> Intro </label>
                             <input id="Intro" type="text" is="emby-input" />
@@ -57,6 +102,8 @@
                             <div class="fieldDescription">Enter the name the chapter will be named for the part after the outro segment.</div>
                         </div>
 
+                        </fieldset>
+
                         <div class="inputContainer">
                             <label class="inputLabel inputLabelUnfocused" for="SelectedLibraries"> Limit analysis to the following libraries </label>
                             <input id="SelectedLibraries" type="text" is="emby-input" />
@@ -76,56 +123,14 @@
                         </div>
 
                         <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="MaxParallelism"> Maximum degree of parallelism </label>
-                            <input id="MaxParallelism" type="number" is="emby-input" min="1" />
-                            <div class="fieldDescription">Maximum degree of parallelism to use when creating chapter files.</div>
-                        </div>
-
-                        <div class="inputContainer">
                             <label class="inputLabel inputLabelUnfocused" for="MaxGap"> Maximum gap between chapters </label>
                             <input id="MaxGap" type="number" is="emby-input" min="0" />
                             <div class="fieldDescription">Maximum gap between chapters in seconds.</div>
                         </div>
-                        <div class="checkboxContainer checkboxContainer-withDescription">
-                            <label class="emby-checkbox-label">
-                                <input id="SkipEmbeddedChapters" type="checkbox" is="emby-checkbox" checked />
-                                <span>Skip items with embedded chapters</span>
-                            </label>
-
-                            <div class="fieldDescription">If checked, the plugin will skip items with embedded chapters.</div>
-                        </div>
-                        <div class="selectContainer">
-                            <label class="selectLabel" for="OutputMode"> Chapter Output Mode </label>
-                            <select id="OutputMode" is="emby-select">
-                                <option value="XmlOnly">XML Files Only</option>
-                                <option value="InjectOnly">Jellyfin Database Only</option>
-                                <option value="Both">Both (XML + Database)</option>
-                            </select>
-                            <div class="fieldDescription">Choose how chapters are saved. XML files are written next to media files. Jellyfin Database makes chapters appear in the player timeline.</div>
-                        </div>
-                        <div class="checkboxContainer checkboxContainer-withDescription">
-                            <label class="emby-checkbox-label">
-                                <input id="ImportXmlChapters" type="checkbox" is="emby-checkbox" checked />
-                                <span>Import previous XML into Jellyfin database</span>
-                            </label>
-
-                            <div class="fieldDescription">If checked, existing XML chapter files will be imported into Jellyfin's database when no media segments are available.</div>
-                        </div>
-                        <div class="checkboxContainer checkboxContainer-withDescription">
-                            <label class="emby-checkbox-label">
-                                <input id="AutoRefresh" type="checkbox" is="emby-checkbox" checked />
-                                <span>Auto-refresh chapters during library scan</span>
-                            </label>
-
-                            <div class="fieldDescription">If checked, chapters will be automatically created or updated when items are scanned during a library refresh.</div>
-                        </div>
-                        <div class="checkboxContainer checkboxContainer-withDescription">
-                            <label class="emby-checkbox-label">
-                                <input id="OverwriteFiles" type="checkbox" is="emby-checkbox" checked />
-                                <span>Update existing XML chapter files</span>
-                            </label>
-
-                            <div class="fieldDescription">If checked, the plugin will update previously created XML files to keep them in sync with Media Segments.</div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="MaxParallelism"> Maximum degree of parallelism </label>
+                            <input id="MaxParallelism" type="number" is="emby-input" min="1" />
+                            <div class="fieldDescription">Maximum degree of parallelism to use when creating chapter files.</div>
                         </div>
                         <div>
                             <button is="emby-button" type="submit" class="raised button-submit block emby-button">
