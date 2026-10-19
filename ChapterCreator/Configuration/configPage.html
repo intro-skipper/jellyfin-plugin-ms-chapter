@@ -154,6 +154,14 @@
                     pluginUniqueId: "e22fb8f5-bc98-4f76-9be4-87de302a97ea",
                 };
 
+                function updateOutputModeOptions() {
+                    var outputMode = document.querySelector("#OutputMode").value;
+                    document.querySelector("#ImportXmlChapters").closest(".checkboxContainer").hidden = outputMode === "XmlOnly";
+                    document.querySelector("#OverwriteFiles").closest(".checkboxContainer").hidden = outputMode === "InjectOnly";
+                }
+
+                document.querySelector("#OutputMode").addEventListener("change", updateOutputModeOptions);
+
                 document.querySelector("#TemplateConfigPage").addEventListener("pageshow", function () {
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(TemplateConfig.pluginUniqueId).then(function (config) {
@@ -173,6 +181,7 @@
                         document.querySelector("#SkippedTvShows").value = config.SkippedTvShows;
                         document.querySelector("#SkippedMovies").value = config.SkippedMovies;
                         document.querySelector("#OutputMode").value = config.OutputMode;
+                        updateOutputModeOptions();
                         document.querySelector("#ImportXmlChapters").checked = config.ImportXmlChapters;
                         document.querySelector("#AutoRefresh").checked = config.AutoRefresh;
                         Dashboard.hideLoadingMsg();
