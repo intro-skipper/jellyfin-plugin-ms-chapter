@@ -5,11 +5,15 @@
         <title>Options</title>
         <style>
             .chapterLabelsSection {
-                margin-bottom: 1em;
+                margin: 1em 0 !important;
             }
 
             .chapterLabelsSection > .inputContainer:last-child {
-                margin-bottom: 0;
+                margin-bottom: 0 !important;
+            }
+
+            .outputModeOptionHidden {
+                display: none !important;
             }
         </style>
     </head>
@@ -156,11 +160,12 @@
 
                 function updateOutputModeOptions() {
                     var outputMode = document.querySelector("#OutputMode").value;
-                    document.querySelector("#ImportXmlChapters").closest(".checkboxContainer").hidden = outputMode === "XmlOnly";
-                    document.querySelector("#OverwriteFiles").closest(".checkboxContainer").hidden = outputMode === "InjectOnly";
+                    document.querySelector("#ImportXmlChapters").closest(".checkboxContainer").classList.toggle("outputModeOptionHidden", outputMode === "XmlOnly");
+                    document.querySelector("#OverwriteFiles").closest(".checkboxContainer").classList.toggle("outputModeOptionHidden", outputMode === "InjectOnly");
                 }
 
                 document.querySelector("#OutputMode").addEventListener("change", updateOutputModeOptions);
+                updateOutputModeOptions();
 
                 document.querySelector("#TemplateConfigPage").addEventListener("pageshow", function () {
                     Dashboard.showLoadingMsg();
