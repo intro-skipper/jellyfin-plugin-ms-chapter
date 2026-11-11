@@ -191,6 +191,25 @@ public partial class ChapterOutputService(
     }
 
     /// <inheritdoc />
+    public bool HasXmlChapters(Guid itemId)
+    {
+        var item = _libraryManager.GetItemById(itemId);
+        if (item is not Video video || string.IsNullOrEmpty(video.Path))
+        {
+            return false;
+        }
+
+        try
+        {
+            return System.IO.File.Exists(ChapterFileManager.GetChapterPath(video.Path, _logger));
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    /// <inheritdoc />
     public ValueTask ImportFromXmlAsync(Guid itemId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

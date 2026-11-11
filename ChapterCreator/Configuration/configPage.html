@@ -57,6 +57,14 @@
                         </div>
                         <div class="checkboxContainer checkboxContainer-withDescription">
                             <label class="emby-checkbox-label">
+                                <input id="PreferXmlChapters" type="checkbox" is="emby-checkbox" />
+                                <span>Prefer existing XML over segment chapters</span>
+                            </label>
+
+                            <div class="fieldDescription">If checked, an item that has a chapter XML file is imported from it even when it also has media segments, and that file is never overwritten. Segments still drive skipping.</div>
+                        </div>
+                        <div class="checkboxContainer checkboxContainer-withDescription">
+                            <label class="emby-checkbox-label">
                                 <input id="OverwriteFiles" type="checkbox" is="emby-checkbox" checked />
                                 <span>Update existing XML chapter files</span>
                             </label>
@@ -161,6 +169,7 @@
                 function updateOutputModeOptions() {
                     var outputMode = document.querySelector("#OutputMode").value;
                     document.querySelector("#ImportXmlChapters").closest(".checkboxContainer").classList.toggle("outputModeOptionHidden", outputMode === "XmlOnly");
+                    document.querySelector("#PreferXmlChapters").closest(".checkboxContainer").classList.toggle("outputModeOptionHidden", outputMode === "XmlOnly");
                     document.querySelector("#OverwriteFiles").closest(".checkboxContainer").classList.toggle("outputModeOptionHidden", outputMode === "InjectOnly");
                 }
 
@@ -188,6 +197,7 @@
                         document.querySelector("#OutputMode").value = config.OutputMode;
                         updateOutputModeOptions();
                         document.querySelector("#ImportXmlChapters").checked = config.ImportXmlChapters;
+                        document.querySelector("#PreferXmlChapters").checked = config.PreferXmlChapters;
                         document.querySelector("#AutoRefresh").checked = config.AutoRefresh;
                         Dashboard.hideLoadingMsg();
                     });
@@ -213,6 +223,7 @@
                         config.SkippedMovies = document.querySelector("#SkippedMovies").value;
                         config.OutputMode = document.querySelector("#OutputMode").value;
                         config.ImportXmlChapters = document.querySelector("#ImportXmlChapters").checked;
+                        config.PreferXmlChapters = document.querySelector("#PreferXmlChapters").checked;
                         config.AutoRefresh = document.querySelector("#AutoRefresh").checked;
                         ApiClient.updatePluginConfiguration(TemplateConfig.pluginUniqueId, config).then(function (result) {
                             Dashboard.processPluginConfigurationUpdateResult(result);

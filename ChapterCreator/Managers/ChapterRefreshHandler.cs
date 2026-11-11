@@ -83,6 +83,13 @@ public sealed partial class ChapterRefreshHandler(
     {
         try
         {
+            var config = _configurationAccessor.GetConfiguration();
+            if (config.ImportXmlChapters && config.PreferXmlChapters && _chapterOutputService.HasXmlChapters(item.Id))
+            {
+                await _chapterOutputService.ImportFromXmlAsync(item.Id, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
             var segments = await _mediaSegmentManager.GetSegmentsAsync(
                 item,
                 null,
