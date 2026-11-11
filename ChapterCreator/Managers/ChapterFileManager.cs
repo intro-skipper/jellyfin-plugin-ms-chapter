@@ -85,7 +85,7 @@ public partial class ChapterFileManager(
             }
 
             var chapterPath = GetChapterPath(filePath, _logger);
-            if (config.PreferXmlChapters && File.Exists(chapterPath))
+            if (config.ImportXmlChapters && config.PreferXmlChapters && File.Exists(chapterPath))
             {
                 // An existing chapter file is authoritative in this mode: never replace it with segment chapters.
                 return;

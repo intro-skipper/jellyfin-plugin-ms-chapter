@@ -74,6 +74,14 @@ public partial class ChapterOutputService(
         var outputMode = config.OutputMode;
         List<ExceptionDispatchInfo>? failures = null;
 
+        // Scheduled tasks and the manual endpoint come through here too: an existing XML wins over segments.
+        if (PrefersXml(config, segments.Key))
+        {
+            LogPreferringXmlChapters(_logger, segments.Key);
+            await ImportFromXmlAsync(segments.Key, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         // Before writing or injecting chapters, check whether the media file itself has
         // chapters embedded in the container.  This prevents generated chapters from
         // competing with the file's chapter set in either output mode.
@@ -138,6 +146,13 @@ public partial class ChapterOutputService(
             return;
         }
 
+        if (PrefersXml(config, segments.Key))
+        {
+            LogPreferringXmlChapters(_logger, segments.Key);
+            await ImportFromXmlAsync(segments.Key, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         if (config.SkipEmbeddedChapters
             && await HasFileEmbeddedChaptersAsync(segments.Key, cancellationToken).ConfigureAwait(false))
         {
@@ -189,6 +204,9 @@ public partial class ChapterOutputService(
             return false;
         }
     }
+
+    private bool PrefersXml(PluginConfiguration config, Guid itemId)
+        => config.ImportXmlChapters && config.PreferXmlChapters && HasXmlChapters(itemId);
 
     /// <inheritdoc />
     public bool HasXmlChapters(Guid itemId)
@@ -535,6 +553,9 @@ public partial class ChapterOutputService(
 
     [LoggerMessage(EventId = 1120, Level = LogLevel.Debug, Message = "Skipping item {Id}: media file has embedded chapters")]
     private static partial void LogSkippingEmbeddedChapters(ILogger logger, Guid id);
+
+    [LoggerMessage(EventId = 1122, Level = LogLevel.Debug, Message = "Item {Id} has a chapter XML and PreferXmlChapters is on: importing it instead of segment chapters")]
+    private static partial void LogPreferringXmlChapters(ILogger logger, Guid id);
 
     [LoggerMessage(EventId = 1121, Level = LogLevel.Warning, Message = "Failed to probe item {Id} for embedded chapters; treating as no embedded chapters")]
     private static partial void LogEmbeddedChapterProbeFailed(ILogger logger, Guid id, Exception ex);
