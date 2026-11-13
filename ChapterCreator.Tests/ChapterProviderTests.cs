@@ -222,6 +222,91 @@ public class ChapterProviderTests
         mediaSegmentManager.VerifyNoOtherCalls();
     }
 
+    [Fact]
+    public async Task FetchAsync_WhenPreferXmlChaptersAndXmlExists_ImportsXmlEvenWithSegments()
+    {
+        var chapterOutputService = new Mock<IChapterOutputService>(MockBehavior.Strict);
+        chapterOutputService
+            .Setup(service => service.HasXmlChapters(It.IsAny<Guid>()))
+            .Returns(true);
+        chapterOutputService
+            .Setup(service => service.ImportFromXmlAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .Returns(ValueTask.CompletedTask);
+
+        var mediaSegmentManager = new Mock<IMediaSegmentManager>(MockBehavior.Strict);
+
+        var sut = CreateSubject(chapterOutputService, mediaSegmentManager, new PluginConfiguration
+        {
+            AutoRefresh = true,
+            ImportXmlChapters = true,
+            PreferXmlChapters = true
+        });
+
+        var movie = CreateMovie();
+        var result = await sut.FetchAsync(movie, null!, CancellationToken.None);
+
+        Assert.Equal(ItemUpdateType.None, result);
+        chapterOutputService.Verify(service => service.HasXmlChapters(movie.Id), Times.Once);
+        chapterOutputService.Verify(service => service.ImportFromXmlAsync(movie.Id, It.IsAny<CancellationToken>()), Times.Once);
+        chapterOutputService.VerifyNoOtherCalls();
+        mediaSegmentManager.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task FetchAsync_WhenPreferXmlChaptersButNoXml_ProcessesSegmentsAsBefore()
+    {
+        var chapterOutputService = new Mock<IChapterOutputService>(MockBehavior.Strict);
+        chapterOutputService
+            .Setup(service => service.HasXmlChapters(It.IsAny<Guid>()))
+            .Returns(false);
+        chapterOutputService
+            .Setup(service => service.ProcessChaptersAsync(It.IsAny<KeyValuePair<Guid, List<MediaSegmentDto>>>(), false, It.IsAny<CancellationToken>()))
+            .Returns(ValueTask.CompletedTask);
+
+        var mediaSegmentManager = new Mock<IMediaSegmentManager>(MockBehavior.Strict);
+        mediaSegmentManager
+            .Setup(manager => manager.GetSegmentsAsync(It.IsAny<Movie>(), null, It.IsAny<LibraryOptions>(), true))
+            .ReturnsAsync(CreateSegments());
+
+        var sut = CreateSubject(chapterOutputService, mediaSegmentManager, new PluginConfiguration
+        {
+            AutoRefresh = true,
+            ImportXmlChapters = true,
+            PreferXmlChapters = true
+        });
+
+        var result = await sut.FetchAsync(CreateMovie(), null!, CancellationToken.None);
+
+        Assert.Equal(ItemUpdateType.None, result);
+        chapterOutputService.Verify(service => service.ImportFromXmlAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+        chapterOutputService.Verify(service => service.ProcessChaptersAsync(It.IsAny<KeyValuePair<Guid, List<MediaSegmentDto>>>(), false, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task FetchAsync_WhenPreferXmlChaptersIsOff_NeverAsksForXml()
+    {
+        var chapterOutputService = new Mock<IChapterOutputService>(MockBehavior.Strict);
+        chapterOutputService
+            .Setup(service => service.ProcessChaptersAsync(It.IsAny<KeyValuePair<Guid, List<MediaSegmentDto>>>(), false, It.IsAny<CancellationToken>()))
+            .Returns(ValueTask.CompletedTask);
+
+        var mediaSegmentManager = new Mock<IMediaSegmentManager>(MockBehavior.Strict);
+        mediaSegmentManager
+            .Setup(manager => manager.GetSegmentsAsync(It.IsAny<Movie>(), null, It.IsAny<LibraryOptions>(), true))
+            .ReturnsAsync(CreateSegments());
+
+        var sut = CreateSubject(chapterOutputService, mediaSegmentManager, new PluginConfiguration
+        {
+            AutoRefresh = true,
+            ImportXmlChapters = true
+        });
+
+        await sut.FetchAsync(CreateMovie(), null!, CancellationToken.None);
+
+        chapterOutputService.Verify(service => service.HasXmlChapters(It.IsAny<Guid>()), Times.Never);
+        chapterOutputService.Verify(service => service.ProcessChaptersAsync(It.IsAny<KeyValuePair<Guid, List<MediaSegmentDto>>>(), false, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     private static ChapterProvider CreateSubject(
         Mock<IChapterOutputService> chapterOutputService,
         Mock<IMediaSegmentManager> mediaSegmentManager,

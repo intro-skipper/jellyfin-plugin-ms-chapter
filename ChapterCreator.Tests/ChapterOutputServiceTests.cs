@@ -292,6 +292,90 @@ public class ChapterOutputServiceTests
         }
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task PreferXmlChapters_WhenXmlExists_ImportsXmlAndNeverInjectsSegments(bool scheduledProcessing)
+    {
+        var itemId = Guid.NewGuid();
+        var tempDir = Directory.CreateTempSubdirectory();
+
+        try
+        {
+            var mediaPath = Path.Combine(tempDir.FullName, "episode.mkv");
+            var chapterDir = Path.Combine(tempDir.FullName, Constants.ChaptersDirectory);
+            Directory.CreateDirectory(chapterDir);
+            await File.WriteAllTextAsync(
+                Path.Combine(chapterDir, $"episode{Constants.ChapterFileSuffix}.xml"),
+                """
+                <Chapters>
+                  <EditionEntry>
+                    <ChapterAtom>
+                      <ChapterTimeStart>00:00:00</ChapterTimeStart>
+                      <ChapterDisplay>
+                        <ChapterString>Authored</ChapterString>
+                      </ChapterDisplay>
+                    </ChapterAtom>
+                  </EditionEntry>
+                </Chapters>
+                """);
+
+            var chapterFileManager = new Mock<IChapterFileManager>(MockBehavior.Strict);
+            var libraryManager = new Mock<ILibraryManager>(MockBehavior.Strict);
+            libraryManager
+                .Setup(manager => manager.GetItemById(itemId))
+                .Returns(new Video { Id = itemId, Path = mediaPath });
+
+            List<MediaBrowser.Model.Entities.ChapterInfo>? saved = null;
+            var jellyfinChapterManager = new Mock<MediaBrowser.Controller.Chapters.IChapterManager>(MockBehavior.Strict);
+            jellyfinChapterManager
+                .Setup(manager => manager.SaveChapters(It.IsAny<Video>(), It.IsAny<List<MediaBrowser.Model.Entities.ChapterInfo>>()))
+                .Callback(new InvocationAction(invocation => saved = new List<MediaBrowser.Model.Entities.ChapterInfo>(
+                    (IEnumerable<MediaBrowser.Model.Entities.ChapterInfo>)invocation.Arguments[1])));
+
+            var sut = new ChapterOutputService(
+                chapterFileManager.Object,
+                jellyfinChapterManager.Object,
+                libraryManager.Object,
+                Mock.Of<MediaBrowser.Controller.MediaEncoding.IMediaEncoder>(MockBehavior.Strict),
+                NullLogger<ChapterOutputService>.Instance,
+                CreateConfigurationAccessor(new PluginConfiguration
+                {
+                    ImportXmlChapters = true,
+                    PreferXmlChapters = true,
+                    OutputMode = ChapterOutputMode.Both
+                }).Object);
+
+            var segments = new KeyValuePair<Guid, List<MediaSegmentDto>>(
+                itemId,
+                [
+                    new MediaSegmentDto
+                    {
+                        StartTicks = 0,
+                        EndTicks = 10_000_000,
+                        Type = Jellyfin.Database.Implementations.Enums.MediaSegmentType.Intro
+                    }
+                ]);
+
+            if (scheduledProcessing)
+            {
+                await sut.ProcessChaptersAsync(segments, true, CancellationToken.None);
+            }
+            else
+            {
+                await sut.InjectChaptersAsync(segments, CancellationToken.None);
+            }
+
+            Assert.NotNull(saved);
+            Assert.Equal("Authored", Assert.Single(saved!).Name);
+            chapterFileManager.VerifyNoOtherCalls();
+        }
+        finally
+        {
+            tempDir.Delete(recursive: true);
+        }
+    }
+
     [Fact]
     public async Task ProcessChaptersAsync_ThrowsWhenXmlWriteFailsInXmlOnly()
     {

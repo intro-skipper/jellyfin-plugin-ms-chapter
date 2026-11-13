@@ -77,6 +77,20 @@ public partial class ChapterProvider(
     private async Task<ItemUpdateType> FetchInternal(Video video, MetadataRefreshOptions options, CancellationToken cancellationToken)
     {
         var config = _configurationAccessor.GetConfiguration();
+        if (config.ImportXmlChapters && config.PreferXmlChapters && _chapterOutputService.HasXmlChapters(video.Id))
+        {
+            try
+            {
+                await _chapterOutputService.ImportFromXmlAsync(video.Id, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                LogXmlImportFailure(_logger, video.Id, video.Name, ex);
+            }
+
+            return ItemUpdateType.None;
+        }
+
         var segmentsList = await _mediaSegmentManager.GetSegmentsAsync(
             video,
             null,

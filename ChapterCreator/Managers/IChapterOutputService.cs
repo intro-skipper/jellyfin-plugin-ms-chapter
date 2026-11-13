@@ -52,6 +52,13 @@ public interface IChapterOutputService
     ValueTask ImportFromXmlAsync(Guid itemId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Returns whether a chapter XML file exists for the media item.
+    /// </summary>
+    /// <param name="itemId">The media item ID.</param>
+    /// <returns><see langword="true"/> when the item's chapter XML file exists.</returns>
+    bool HasXmlChapters(Guid itemId);
+
+    /// <summary>
     /// Clears existing chapter output for a media item.
     /// Removes generated XML, injected Jellyfin chapters, or both, based on configuration.
     /// </summary>

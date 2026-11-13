@@ -100,4 +100,12 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets a value indicating whether to import chapters from existing XML files into Jellyfin's database.
     /// </summary>
     public bool ImportXmlChapters { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether an existing chapter XML file wins over chapters generated from media
+    /// segments. When enabled, an item with a chapter XML is imported from that file (even when it also has segments),
+    /// the file is never overwritten, and metadata refreshes re-import it instead of re-injecting segment chapters.
+    /// Use this when chapter files are authored by hand or by another tool and segments are still wanted for skipping.
+    /// </summary>
+    public bool PreferXmlChapters { get; set; }
 }
